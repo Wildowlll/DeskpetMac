@@ -26,6 +26,31 @@ jobs:
       - name: Build DeskPet.app
         run: bash DeskPetMac/build_app.sh
 
+      # 맥이 없어도 실행 여부를 확인할 수 있게: GitHub 맥 서버에서 실제로 켜 보고 로그 + 스크린샷을 남김
+      - name: Smoke test (실제 실행해 보기)
+        continue-on-error: true
+        run: |
+          rm -f ~/Library/Logs/DeskPet.log
+          open DeskPetMac/dist/DeskPet.app
+          sleep 20
+          mkdir -p smoke
+          screencapture -x smoke/screen.png || echo "screencapture 실패"
+          echo "----- 실행 중인 프로세스 -----"
+          pgrep -lf DeskPet || echo "(실행 중 아님)"
+          echo "----- DeskPet.log -----"
+          cat ~/Library/Logs/DeskPet.log || echo "(로그 없음 — 앱 코드가 아예 시작 안 됨)"
+          cp ~/Library/Logs/DeskPet.log smoke/ 2>/dev/null || true
+          ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i deskpet && cp ~/Library/Logs/DiagnosticReports/*DeskPet* smoke/ 2>/dev/null || true
+          pkill -x DeskPet || true
+          grep -q "page loaded" smoke/DeskPet.log && echo "✅ 창 로딩 확인" || { echo "::warning::페이지 로딩이 확인되지 않았어요"; exit 1; }
+
+      - name: Upload smoke test result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test
+          path: smoke/
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
