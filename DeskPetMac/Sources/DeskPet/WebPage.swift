@@ -41,7 +41,10 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
             webView.underPageBackgroundColor = .clear
         }
 
-        guard let web = Bundle.main.resourceURL?.appendingPathComponent("web"),
+        // ⚠ Bundle.main.resourceURL은 "Contents/Resources/ -- file:///…/DeskPet.app/" 같은 *상대* URL이라
+        //   그대로 URLComponents에 넣으면 앞부분(앱 경로)이 떨어져 나가 "파일 URL이 아님" 예외로 조용히 멈춤.
+        //   반드시 절대 경로 URL로 바꿔서 씀.
+        guard let web = Bundle.main.resourceURL?.appendingPathComponent("web", isDirectory: true).absoluteURL.standardizedFileURL,
               FileManager.default.fileExists(atPath: web.appendingPathComponent("index.html").path) else {
             Log.write("web/index.html missing in \(Bundle.main.bundlePath)")
             DispatchQueue.main.async {
@@ -50,10 +53,14 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
             }
             return
         }
-        var comps = URLComponents(url: web.appendingPathComponent("index.html"), resolvingAgainstBaseURL: false)!
-        comps.query = query
-        Log.write("web: load \(comps.url?.absoluteString ?? "nil")")
-        webView.loadFileURL(comps.url!, allowingReadAccessTo: web)
+        let index = web.appendingPathComponent("index.html")
+        var comps = URLComponents(url: index, resolvingAgainstBaseURL: true)
+        comps?.query = query
+        let url = comps?.url ?? index
+        Log.write("web: load \(url.absoluteString)")
+        guard url.isFileURL else { Log.write("web: not a file URL?!"); return }
+        webView.loadFileURL(url, allowingReadAccessTo: web)
+        Log.write("web: load requested")
     }
 
     func post(_ obj: [String: Any]) {
