@@ -26,6 +26,7 @@ final class Shell {
     /// "window" = 다마고치 창, "free" = 바탕화면 자유 모드
     func open(_ mode: String) {
         let m = mode == "free" ? "free" : "window"
+        Log.write("open \(m)")
         if let c = current, c.mode == m { c.show(); return }
         settings.mode = m
 
@@ -40,6 +41,11 @@ final class Shell {
             DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: closeOld)
         }
         next.show()
+    }
+
+    /// 지금 모드의 창을 다시 앞으로 (없으면 저장된 모드로 새로 열기)
+    func reveal() {
+        if let c = current { c.show() } else { open(settings.mode) }
     }
 
     func showWindowMode() {
@@ -85,6 +91,8 @@ final class Shell {
                 self.onLangChange?()
                 self.pages.values.forEach { $0.applyLang() }
             }
+        case "log":    // 페이지의 JS 오류 등 → ~/Library/Logs/DeskPet.log
+            Log.write("[page] " + (msg["msg"] as? String ?? ""))
         case "notify":
             Notifier.show(title: msg["title"] as? String ?? "", body: msg["body"] as? String ?? "")
         case "setAutostart":

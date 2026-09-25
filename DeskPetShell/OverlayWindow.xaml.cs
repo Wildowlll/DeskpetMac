@@ -25,7 +25,10 @@ public partial class OverlayWindow : Window, IWebHost
 
     IntPtr _hwnd;
     bool _clickThrough;
-    List<Rect> _hitRects = new();   // 창 기준 DIP 좌표 (= CSS px)
+    List<Rect> _hitRects = new();   // 창 기준 DIP 좌표
+    // CSS px → DIP 배율. 보통 1이지만, 윈도우 [텍스트 크기]를 키우면 웹 화면이 통째로 확대돼서
+    // CSS 1px이 DIP 1보다 커짐 → 페이지가 알려준 뷰포트 폭(vw)과 실제 창 폭으로 매번 계산
+    double _k = 1;
     readonly DispatcherTimer _hitTimer = new() { Interval = TimeSpan.FromMilliseconds(30) };
     readonly NativeDrag _drag = new();
     Point _lastSent;
@@ -67,10 +70,11 @@ public partial class OverlayWindow : Window, IWebHost
         switch (msg.GetProperty("type").GetString())
         {
             case "hitRects":
+                if (msg.TryGetProperty("vw", out var vw) && vw.GetDouble() > 0) _k = ActualWidth / vw.GetDouble();
                 _hitRects = msg.GetProperty("rects").EnumerateArray()
-                    .Select(r => new Rect(
-                        r.GetProperty("x").GetDouble(), r.GetProperty("y").GetDouble(),
-                        r.GetProperty("w").GetDouble(), r.GetProperty("h").GetDouble()))
+                    .Select(r => new Rect(   // CSS px → DIP
+                        r.GetProperty("x").GetDouble() * _k, r.GetProperty("y").GetDouble() * _k,
+                        r.GetProperty("w").GetDouble() * _k, r.GetProperty("h").GetDouble() * _k))
                     .ToList();
                 break;
 
@@ -80,7 +84,8 @@ public partial class OverlayWindow : Window, IWebHost
                 _drag.Start(
                     (screen, _) =>
                     {
-                        var p = PointFromScreen(screen);   // 물리 px → 창 기준 DIP
+                        var d = PointFromScreen(screen);   // 물리 px → 창 기준 DIP
+                        var p = new Point(d.X / _k, d.Y / _k);   // DIP → CSS px
                         if (p == _lastSent) return;
                         _lastSent = p;
                         Post(FormattableString.Invariant(

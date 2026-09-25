@@ -15,7 +15,9 @@ public partial class App : Application
         _single = new Mutex(true, "DeskPet_SingleInstance_7f3a", out bool first);
         if (!first)
         {
-            MessageBox.Show("데스크펫이 이미 실행 중이에요.\n작업표시줄 오른쪽 알림 영역의 🐾 아이콘을 확인해 주세요.", "DeskPet");
+            var ko = System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ko";
+            MessageBox.Show(ko ? "데스크펫이 이미 실행 중이에요.\n작업표시줄 오른쪽 알림 영역의 🐾 아이콘을 확인해 주세요."
+                               : "DeskPet is already running.\nLook for the 🐾 icon in the notification area of the taskbar.", "DeskPet");
             Shutdown();
             return;
         }
@@ -31,7 +33,7 @@ public partial class App : Application
         }
         catch (Exception ex)
         {
-            MessageBox.Show("시작 중 오류가 발생했어요.\n\n" + ex, "DeskPet");
+            MessageBox.Show(Shell.L("시작 중 오류가 발생했어요.", "An error occurred while starting.") + "\n\n" + ex, "DeskPet");
             Shutdown();
         }
     }

@@ -148,7 +148,7 @@ public partial class PetWindow : Window, IWebHost
                 var enc = new PngBitmapEncoder();
                 enc.Frames.Add(BitmapFrame.Create(crop));
                 using (var fs = File.Create(path)) enc.Save(fs);
-                PostCaptured(true, "📷 사진\\DeskPet 폴더에 저장했어요");
+                PostCaptured(true, "📷 Pictures\\DeskPet", "capSavedApp");
             }
             else
             {
@@ -158,7 +158,7 @@ public partial class PetWindow : Window, IWebHost
                     try { Clipboard.SetImage(crop); break; }
                     catch (System.Runtime.InteropServices.COMException) when (i < 4) { await Task.Delay(60); }
                 }
-                PostCaptured(true, "📋 클립보드에 복사했어요");
+                PostCaptured(true, "📋", "capCopied");
             }
         }
         catch (Exception ex)
@@ -167,8 +167,9 @@ public partial class PetWindow : Window, IWebHost
         }
     }
 
-    void PostCaptured(bool ok, string text) =>
-        Post(JsonSerializer.Serialize(new { type = "captured", ok, msg = text }));
+    // code: 페이지가 현재 언어로 문구를 고르는 키 / msg: 실패 시 오류 내용
+    void PostCaptured(bool ok, string text, string code = "") =>
+        Post(JsonSerializer.Serialize(new { type = "captured", ok, msg = text, code }));
 
     void Post(string json) => Shell.SafePost(Web.CoreWebView2, json);
 

@@ -17,6 +17,7 @@
     <RootNamespace>DeskPetShell</RootNamespace>
     <AssemblyName>DeskPet</AssemblyName>
     <ApplicationIcon>app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- exe 속성 창에 보이는 정보. 업데이트할 때 Version만 올리면 됨 -->
     <Version>1.0.0</Version>
     <Product>데스크펫</Product>

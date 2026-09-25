@@ -27,7 +27,7 @@ html, body { margin: 0; }
 body { color: var(--ink); font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
 button { font: inherit; color: inherit; }
 body.mode-window, body.mode-free { overflow: hidden; user-select: none; -webkit-user-select: none; }
-body.mode-window { width: 360px; height: 300px; background: var(--frame); }
+body.mode-window { width: 100vw; height: 100vh; background: var(--frame); }
 body.mode-free   { width: 100vw; height: 100vh; background: transparent; }   /* 오버레이 핵심: 투명 */
 body:not(.mode-window) #win, body:not(.mode-free) #free, body:not(.mode-settings) #settings-page, body:not(.mode-pool) #pool-page { display: none !important; }
 
@@ -100,7 +100,8 @@ body:not(.mode-window) #win, body:not(.mode-free) #free, body:not(.mode-settings
    ===================================================================== */
 .bevel-out { border: 2px solid; border-color: var(--frame-hi) var(--frame-lo) var(--frame-lo) var(--frame-hi); }
 .bevel-in  { border: 2px solid; border-color: var(--frame-lo) var(--frame-hi) var(--frame-hi) var(--frame-lo); }
-#win { position: relative; width: 360px; height: 300px; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+#win { position: relative; width: 360px; height: 300px; padding: 4px; display: flex; flex-direction: column; gap: 4px;
+       transform-origin: 0 0; }   /* 창 크기에 맞춰 JS가 scale()로 맞춤 (fitWindow) */
 
 #titlebar { height: 26px; flex: none; display: flex; align-items: center; gap: 3px; padding: 0 3px 0 7px;
   background: linear-gradient(var(--title-a), var(--title-b)); border: 2px solid var(--ink); border-radius: 7px; cursor: default; }
@@ -210,6 +211,7 @@ body:not(.mode-window) #win, body:not(.mode-free) #free, body:not(.mode-settings
 #m-sub, #m-aff { font-size: 11px; opacity: .8; margin-bottom: 6px; }
 .stat { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
 .stat span { width: 48px; }
+html[lang=en] .stat span { width: 78px; white-space: nowrap; }   /* 영어 스탯 이름이 더 김 */
 .bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
 .bar i { display: block; height: 100%; background: #f2a65a; transition: width .5s; }
 .bar i.bad { background: var(--bad); }
@@ -333,12 +335,12 @@ body.mode-pool { background: var(--cream); height: 100vh; overflow: hidden; }
   <div id="titlebar">
     <span>🐾</span>
     <span id="tb-name"></span>
-    <button class="tb-btn bevel-out" id="btn-shot" title="스크린샷 저장">📷</button>
-    <button class="tb-btn bevel-out" id="btn-copy" title="클립보드에 복사">📋</button>
-    <button class="tb-btn bevel-out" id="btn-set" title="설정">⚙</button>
-    <button class="tb-btn bevel-out" id="btn-pin" title="항상 위에 표시">📌</button>
-    <button class="tb-btn bevel-out" id="btn-min" title="최소화">_</button>
-    <button class="tb-btn bevel-out" id="btn-close" title="종료">✕</button>
+    <button class="tb-btn bevel-out" id="btn-shot" data-i18n-title="tb.shot" title="스크린샷 저장">📷</button>
+    <button class="tb-btn bevel-out" id="btn-copy" data-i18n-title="tb.copy" title="클립보드에 복사">📋</button>
+    <button class="tb-btn bevel-out" id="btn-set" data-i18n-title="tb.set" title="설정">⚙</button>
+    <button class="tb-btn bevel-out" id="btn-pin" data-i18n-title="tb.pin" title="항상 위에 표시">📌</button>
+    <button class="tb-btn bevel-out" id="btn-min" data-i18n-title="tb.min" title="최소화">_</button>
+    <button class="tb-btn bevel-out" id="btn-close" data-i18n-title="tb.close" title="종료">✕</button>
   </div>
 
   <div id="main">
@@ -353,17 +355,17 @@ body.mode-pool { background: var(--cream); height: 100vh; overflow: hidden; }
       <div id="date-bg"></div>
       <div id="hg"></div>
       <div id="banner"></div>
-      <button id="add-char" title="두 번째 캐릭터 추가"><b>＋</b>친구</button>
+      <button id="add-char" data-i18n-title="room.addTitle" title="두 번째 캐릭터 추가" data-i18n="room.add"><b>＋</b>친구</button>
       <div id="dim"></div>
     </div>
     <div id="stats" class="bevel-in">
       <div id="st-head"></div>
       <table>
-        <tr><td>밥</td><td class="v" id="st-hunger"></td></tr>
-        <tr><td>기분</td><td class="v" id="st-happy"></td></tr>
-        <tr><td>체력</td><td class="v" id="st-energy"></td></tr>
-        <tr><td>청결</td><td class="v" id="st-clean"></td></tr>
-        <tr><td>건강</td><td class="v" id="st-health"></td></tr>
+        <tr><td data-i18n="stat.hunger">밥</td><td class="v" id="st-hunger"></td></tr>
+        <tr><td data-i18n="stat.happy">기분</td><td class="v" id="st-happy"></td></tr>
+        <tr><td data-i18n="stat.energy">체력</td><td class="v" id="st-energy"></td></tr>
+        <tr><td data-i18n="stat.clean">청결</td><td class="v" id="st-clean"></td></tr>
+        <tr><td data-i18n="stat.health">건강</td><td class="v" id="st-health"></td></tr>
       </table>
       <div id="st-age"></div>
       <div id="st-aff"></div>
@@ -371,19 +373,19 @@ body.mode-pool { background: var(--cream); height: 100vh; overflow: hidden; }
   </div>
 
   <div id="toolbar" class="bevel-out">
-    <button class="tool bevel-out" data-act="feed"     title="밥주기">🍚</button>
-    <button class="tool bevel-out" data-act="play"     title="놀아주기">🎾</button>
-    <button class="tool bevel-out" data-act="sleep"    title="재우기">🌙</button>
-    <button class="tool bevel-out" data-act="clean"    title="씻기기">🛁</button>
-    <button class="tool bevel-out" data-act="medicine" title="약주기">💊</button>
-    <button class="tool bevel-out" data-act="pet"      title="쓰다듬기">✋</button>
-    <button class="tool bevel-out" id="sp-btn"         title="특별 이벤트">💞</button>
+    <button class="tool bevel-out" data-act="feed"     data-i18n-title="act.feed" title="밥주기">🍚</button>
+    <button class="tool bevel-out" data-act="play"     data-i18n-title="act.play" title="놀아주기">🎾</button>
+    <button class="tool bevel-out" data-act="sleep"    data-i18n-title="act.sleep" title="재우기">🌙</button>
+    <button class="tool bevel-out" data-act="clean"    data-i18n-title="act.clean" title="씻기기">🛁</button>
+    <button class="tool bevel-out" data-act="medicine" data-i18n-title="act.medicine" title="약주기">💊</button>
+    <button class="tool bevel-out" data-act="pet"      data-i18n-title="act.pet" title="쓰다듬기">✋</button>
+    <button class="tool bevel-out" id="sp-btn"         data-i18n-title="act.special" title="특별 이벤트">💞</button>
     <span class="sep"></span>
-    <button class="tool bevel-out mode" id="to-free" title="바탕화면을 돌아다니게 하기">자유 모드</button>
+    <button class="tool bevel-out mode" id="to-free" data-i18n-title="win.toFreeTitle" title="바탕화면을 돌아다니게 하기" data-i18n="win.toFree">자유 모드</button>
     <div id="sp-pop">
-      <button class="sp-btn" id="sp-gift" data-sp="gift">🎁 선물<small></small></button>
-      <button class="sp-btn" id="sp-kiss" data-sp="kiss">💋 뽀뽀<small></small></button>
-      <button class="sp-btn" id="sp-date" data-sp="date">🌸 데이트<small></small></button>
+      <button class="sp-btn" id="sp-gift" data-sp="gift"><span data-i18n="sp.gift">🎁 선물</span><small></small></button>
+      <button class="sp-btn" id="sp-kiss" data-sp="kiss"><span data-i18n="sp.kiss">💋 뽀뽀</span><small></small></button>
+      <button class="sp-btn" id="sp-date" data-sp="date"><span data-i18n="sp.date">🌸 데이트</span><small></small></button>
     </div>
   </div>
 
@@ -397,167 +399,175 @@ body.mode-pool { background: var(--cream); height: 100vh; overflow: hidden; }
   <div id="menu">
     <div id="m-name"></div>
     <div id="m-sub"></div>
-    <div class="stat"><span>🍎 밥</span><div class="bar"><i id="m-hunger"></i></div></div>
-    <div class="stat"><span>😊 기분</span><div class="bar"><i id="m-happy"></i></div></div>
-    <div class="stat"><span>⚡ 체력</span><div class="bar"><i id="m-energy"></i></div></div>
-    <div class="stat"><span>🛁 청결</span><div class="bar"><i id="m-clean"></i></div></div>
-    <div class="stat"><span>❤️ 건강</span><div class="bar"><i id="m-health"></i></div></div>
+    <div class="stat"><span data-i18n="statE.hunger">🍎 밥</span><div class="bar"><i id="m-hunger"></i></div></div>
+    <div class="stat"><span data-i18n="statE.happy">😊 기분</span><div class="bar"><i id="m-happy"></i></div></div>
+    <div class="stat"><span data-i18n="statE.energy">⚡ 체력</span><div class="bar"><i id="m-energy"></i></div></div>
+    <div class="stat"><span data-i18n="statE.clean">🛁 청결</span><div class="bar"><i id="m-clean"></i></div></div>
+    <div class="stat"><span data-i18n="statE.health">❤️ 건강</span><div class="bar"><i id="m-health"></i></div></div>
     <div class="m-grid">
-      <button data-act="feed">🍎 밥주기</button>
-      <button data-act="play">🎾 놀아주기</button>
+      <button data-act="feed" data-i18n="actE.feed">🍎 밥주기</button>
+      <button data-act="play" data-i18n="actE.play">🎾 놀아주기</button>
       <button data-act="sleep">💤 재우기</button>
-      <button data-act="clean">🛁 씻기기</button>
-      <button data-act="medicine">💊 약주기</button>
-      <button data-act="pet">✨ 쓰다듬기</button>
+      <button data-act="clean" data-i18n="actE.clean">🛁 씻기기</button>
+      <button data-act="medicine" data-i18n="actE.medicine">💊 약주기</button>
+      <button data-act="pet" data-i18n="actE.pet">✨ 쓰다듬기</button>
     </div>
     <div id="m-special">
       <div id="m-aff"></div>
       <div class="m-grid" style="margin-top:0">
-        <button data-sp="gift">🎁 선물<small></small></button>
-        <button data-sp="kiss">💋 뽀뽀<small></small></button>
-        <button data-sp="date">🌸 데이트<small></small></button>
+        <button data-sp="gift"><span data-i18n="sp.gift">🎁 선물</span><small></small></button>
+        <button data-sp="kiss"><span data-i18n="sp.kiss">💋 뽀뽀</span><small></small></button>
+        <button data-sp="date"><span data-i18n="sp.date">🌸 데이트</span><small></small></button>
       </div>
     </div>
-    <div class="m-foot"><button id="m-window">🏠 창 모드</button><button id="m-set">⚙ 설정</button><button id="m-quit">종료</button></div>
+    <div class="m-foot"><button id="m-window" data-i18n="free.toWindow">🏠 창 모드</button><button id="m-set" data-i18n="free.settings">⚙ 설정</button><button id="m-quit" data-i18n="free.quit">종료</button></div>
   </div>
 </div>
 
 <!-- ══════════════════════ 설정 창 (원본 설정 팝업) ══════════════════════ -->
 <div id="settings-page">
-  <div id="set-titlebar"><span>⚙ 설정 — 데스크펫</span><button id="set-close">✕</button></div>
+  <div id="set-titlebar"><span data-i18n="set.title">⚙ 설정 — 데스크펫</span><button id="set-close">✕</button></div>
   <div id="set-tabs">
-    <button class="set-tab active" data-tab="common">공통</button>
-    <button class="set-tab" data-tab="c0">캐릭터1</button>
-    <button class="set-tab" data-tab="c1">캐릭터2</button>
-    <button class="set-tab" data-tab="log">📜 로그</button>
-    <button class="set-tab" data-tab="diary">📔 일기</button>
-    <button class="set-tab" data-tab="achv">🏆 업적</button>
-    <button class="set-tab" data-tab="data">💾 데이터</button>
+    <button class="set-tab active" data-tab="common" data-i18n="set.tabCommon">공통</button>
+    <button class="set-tab" data-tab="c0" data-i18n="set.tabC0">캐릭터1</button>
+    <button class="set-tab" data-tab="c1" data-i18n="set.tabC1">캐릭터2</button>
+    <button class="set-tab" data-tab="log" data-i18n="set.tabLog">📜 로그</button>
+    <button class="set-tab" data-tab="diary" data-i18n="set.tabDiary">📔 일기</button>
+    <button class="set-tab" data-tab="achv" data-i18n="set.tabAchv">🏆 업적</button>
+    <button class="set-tab" data-tab="data" data-i18n="set.tabData">💾 데이터</button>
   </div>
   <div class="set-body">
 
     <div class="tab-panel active" id="panel-common">
       <div class="set-section">
-        <span class="set-label">📏 창 크기</span>
+        <span class="set-label">🌐 언어 / Language</span>
         <div class="size-btns">
-          <button class="sz-btn" data-sc="1">소</button>
-          <button class="sz-btn" data-sc="1.25">중</button>
-          <button class="sz-btn" data-sc="1.5">대</button>
+          <button class="sz-btn lang-btn" data-lang="ko">한국어</button>
+          <button class="sz-btn lang-btn" data-lang="en">English</button>
         </div>
       </div>
       <hr class="divider">
       <div class="set-section">
-        <span class="set-label">⏱ 욕구 감소 속도</span>
+        <span class="set-label" data-i18n="set.size">📏 창 크기</span>
+        <div class="size-btns">
+          <button class="sz-btn" data-sc="1" data-i18n="set.sizeS">소</button>
+          <button class="sz-btn" data-sc="1.25" data-i18n="set.sizeM">중</button>
+          <button class="sz-btn" data-sc="1.5" data-i18n="set.sizeL">대</button>
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="set-section">
+        <span class="set-label" data-i18n="set.decay">⏱ 욕구 감소 속도</span>
         <div class="preset-btns">
-          <button class="ps-btn" data-ps="vslow">🐢<br>매우 느긋</button>
-          <button class="ps-btn" data-ps="slow">🌱<br>느긋하게</button>
-          <button class="ps-btn" data-ps="normal">🌿<br>보통</button>
-          <button class="ps-btn" data-ps="fast">🔥<br>빡빡하게</button>
+          <button class="ps-btn" data-ps="vslow" data-i18n="set.ps.vslow">🐢<br>매우 느긋</button>
+          <button class="ps-btn" data-ps="slow" data-i18n="set.ps.slow">🌱<br>느긋하게</button>
+          <button class="ps-btn" data-ps="normal" data-i18n="set.ps.normal">🌿<br>보통</button>
+          <button class="ps-btn" data-ps="fast" data-i18n="set.ps.fast">🔥<br>빡빡하게</button>
         </div>
       </div>
       <hr class="divider">
       <div class="set-section">
-        <span class="set-label">📅 날짜 속도 <small>(앱이 켜져 있는 시간 기준 하루)</small></span>
+        <span class="set-label" data-i18n="set.day">📅 날짜 속도 <small>(앱이 켜져 있는 시간 기준 하루)</small></span>
         <div class="preset-btns">
-          <button class="ps-btn" data-ds="slow">🐌<br>24시간</button>
-          <button class="ps-btn" data-ds="normal">🌿<br>4시간</button>
-          <button class="ps-btn" data-ds="fast">⚡<br>1시간</button>
+          <button class="ps-btn" data-ds="slow" data-i18n="set.ds.slow">🐌<br>24시간</button>
+          <button class="ps-btn" data-ds="normal" data-i18n="set.ds.normal">🌿<br>4시간</button>
+          <button class="ps-btn" data-ds="fast" data-i18n="set.ds.fast">⚡<br>1시간</button>
         </div>
       </div>
       <hr class="divider">
       <div class="set-section">
-        <span class="set-label">🔑 Gemini API 키 <small>(무료 · aistudio.google.com)</small></span>
+        <span class="set-label" data-i18n="set.apikey">🔑 Gemini API 키 <small>(무료 · aistudio.google.com)</small></span>
         <input class="set-input" id="set-apikey" type="password" placeholder="AIza...">
-        <button class="data-btn" id="btn-open-pool" type="button">💬 대사 풀 보기 · 편집</button>
+        <button class="data-btn" id="btn-open-pool" type="button" data-i18n="set.openPool">💬 대사 풀 보기 · 편집</button>
       </div>
       <div class="set-section" id="relation-wrap" style="display:none">
-        <span class="set-label">💞 두 캐릭터의 관계 <small>(없으면 호감도 기반 자동 설정)</small></span>
-        <textarea class="set-input" id="set-relation" rows="2" placeholder="예) 소꿉친구. 티격태격하지만 사실 많이 좋아함."></textarea>
+        <span class="set-label" data-i18n="set.relation">💞 두 캐릭터의 관계 <small>(없으면 호감도 기반 자동 설정)</small></span>
+        <textarea class="set-input" id="set-relation" rows="2" data-i18n-ph="set.relationPh" placeholder="예) 소꿉친구. 티격태격하지만 사실 많이 좋아함."></textarea>
       </div>
       <hr class="divider">
       <div class="set-section">
-        <span class="set-label">🔔 알림 <small id="notify-where">(윈도우 알림으로 와요)</small></span>
-        <label class="chk"><input type="checkbox" id="set-notify-on"> 알림 켜기</label>
-        <span class="set-label" style="font-size:10px">알림 기준 수치: <span id="threshold-val">20</span></span>
+        <span class="set-label"><span data-i18n="set.notify">🔔 알림</span> <small id="notify-where">(윈도우 알림으로 와요)</small></span>
+        <label class="chk"><input type="checkbox" id="set-notify-on"> <span data-i18n="set.notifyOn">알림 켜기</span></label>
+        <span class="set-label" style="font-size:10px"><span data-i18n="set.threshold">알림 기준 수치:</span> <span id="threshold-val">20</span></span>
         <input type="range" id="set-notify-threshold" min="10" max="40" step="1" value="20">
-        <span class="set-label" style="font-size:10px">알림 최소 간격: <span id="interval-val">10</span>분</span>
+        <span class="set-label" style="font-size:10px"><span data-i18n="set.interval">알림 최소 간격:</span> <span id="interval-val">10</span><span data-i18n="set.min">분</span></span>
         <input type="range" id="set-notify-interval" min="1" max="60" step="1" value="10">
-        <span class="set-label" style="font-size:10px">알림 받을 스탯</span>
+        <span class="set-label" style="font-size:10px" data-i18n="set.notifyStats">알림 받을 스탯</span>
         <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <label class="chk"><input type="checkbox" id="nstat-hunger"> 🍎 밥</label>
-          <label class="chk"><input type="checkbox" id="nstat-happy"> 😊 기분</label>
-          <label class="chk"><input type="checkbox" id="nstat-energy"> ⚡ 체력</label>
-          <label class="chk"><input type="checkbox" id="nstat-clean"> 🛁 청결</label>
-          <label class="chk"><input type="checkbox" id="nstat-health"> ❤️ 건강</label>
+          <label class="chk"><input type="checkbox" id="nstat-hunger"> <span data-i18n="statE.hunger">🍎 밥</span></label>
+          <label class="chk"><input type="checkbox" id="nstat-happy"> <span data-i18n="statE.happy">😊 기분</span></label>
+          <label class="chk"><input type="checkbox" id="nstat-energy"> <span data-i18n="statE.energy">⚡ 체력</span></label>
+          <label class="chk"><input type="checkbox" id="nstat-clean"> <span data-i18n="statE.clean">🛁 청결</span></label>
+          <label class="chk"><input type="checkbox" id="nstat-health"> <span data-i18n="statE.health">❤️ 건강</span></label>
         </div>
-        <div id="notify-perm-warn" class="set-note" style="display:none;color:var(--red)">⚠️ 알림 권한이 거부됐어요.</div>
+        <div id="notify-perm-warn" class="set-note" style="display:none;color:var(--red)" data-i18n="set.permDenied">⚠️ 알림 권한이 거부됐어요.</div>
       </div>
       <hr class="divider">
       <div class="set-section" id="autostart-wrap" style="display:none">
-        <span class="set-label">🚀 시작 프로그램 <small>(누르면 바로 적용돼요)</small></span>
+        <span class="set-label" data-i18n="set.autostart">🚀 시작 프로그램 <small>(누르면 바로 적용돼요)</small></span>
         <label class="chk"><input type="checkbox" id="set-autostart"> <span id="autostart-label">윈도우를 켤 때 데스크펫도 같이 켜기</span></label>
       </div>
       <hr class="divider" id="autostart-div" style="display:none">
       <div class="set-section">
-        <span class="set-label">💬 대사 지속 시간 <small>(자유 모드 말풍선)</small>: <span id="bubble-dur-val">3초</span></span>
+        <span class="set-label"><span data-i18n="set.bubbleDur">💬 대사 지속 시간 <small>(자유 모드 말풍선)</small>:</span> <span id="bubble-dur-val">3초</span></span>
         <input type="range" id="set-bubble-dur" min="1" max="10" step="1" value="3">
       </div>
-      <button class="set-save" id="btn-save-common">💾 저장</button>
+      <button class="set-save" id="btn-save-common" data-i18n="set.save">💾 저장</button>
     </div>
 
     <div class="tab-panel" id="panel-c0">
-      <div class="set-section"><span class="set-label">🏷️ 이름</span>
-        <input class="set-input" id="set-name0" type="text" maxlength="8" placeholder="캐릭터1 이름..."></div>
-      <div class="set-section"><span class="set-label">✨ 성격 <small>(AI 대사에 반영)</small></span>
-        <textarea class="set-input" id="set-persona0" rows="3" placeholder="예) 활발하고 먹을 것을 좋아함. 잠이 많음."></textarea></div>
-      <div class="set-section"><span class="set-label">🖼️ 이미지 <small>(펫 창에서 펫을 우클릭해도 돼요)</small></span>
+      <div class="set-section"><span class="set-label" data-i18n="set.name">🏷️ 이름</span>
+        <input class="set-input" id="set-name0" type="text" maxlength="8" data-i18n-ph="set.name0Ph" placeholder="캐릭터1 이름..."></div>
+      <div class="set-section"><span class="set-label" data-i18n="set.persona">✨ 성격 <small>(AI 대사에 반영)</small></span>
+        <textarea class="set-input" id="set-persona0" rows="3" data-i18n-ph="set.persona0Ph" placeholder="예) 활발하고 먹을 것을 좋아함. 잠이 많음."></textarea></div>
+      <div class="set-section"><span class="set-label" data-i18n="set.image0">🖼️ 이미지 <small>(펫 창에서 펫을 우클릭해도 돼요)</small></span>
         <div class="img-upload-box" id="imgbox0"><img class="img-preview" id="setprev0" style="display:none" alt="">
-          <span id="imglbl0">🐾 클릭해서 업로드</span><input type="file" id="setfile0" accept="image/*" hidden></div></div>
-      <button class="set-save" id="btn-save0">💾 저장</button>
+          <span id="imglbl0" data-i18n="set.upload">🐾 클릭해서 업로드</span><input type="file" id="setfile0" accept="image/*" hidden></div></div>
+      <button class="set-save" id="btn-save0" data-i18n="set.save">💾 저장</button>
     </div>
 
     <div class="tab-panel" id="panel-c1">
-      <div class="set-section"><span class="set-label">🏷️ 이름</span>
-        <input class="set-input" id="set-name1" type="text" maxlength="8" placeholder="캐릭터2 이름..."></div>
-      <div class="set-section"><span class="set-label">✨ 성격 <small>(AI 대사에 반영)</small></span>
-        <textarea class="set-input" id="set-persona1" rows="3" placeholder="예) 조용하고 차분함. 독서를 좋아함."></textarea></div>
-      <div class="set-section"><span class="set-label">🖼️ 이미지</span>
+      <div class="set-section"><span class="set-label" data-i18n="set.name">🏷️ 이름</span>
+        <input class="set-input" id="set-name1" type="text" maxlength="8" data-i18n-ph="set.name1Ph" placeholder="캐릭터2 이름..."></div>
+      <div class="set-section"><span class="set-label" data-i18n="set.persona">✨ 성격 <small>(AI 대사에 반영)</small></span>
+        <textarea class="set-input" id="set-persona1" rows="3" data-i18n-ph="set.persona1Ph" placeholder="예) 조용하고 차분함. 독서를 좋아함."></textarea></div>
+      <div class="set-section"><span class="set-label" data-i18n="set.image">🖼️ 이미지</span>
         <div class="img-upload-box" id="imgbox1"><img class="img-preview" id="setprev1" style="display:none" alt="">
-          <span id="imglbl1">🐾 클릭해서 업로드</span><input type="file" id="setfile1" accept="image/*" hidden></div></div>
-      <button class="set-save" id="btn-save1">💾 저장</button>
+          <span id="imglbl1" data-i18n="set.upload">🐾 클릭해서 업로드</span><input type="file" id="setfile1" accept="image/*" hidden></div></div>
+      <button class="set-save" id="btn-save1" data-i18n="set.save">💾 저장</button>
     </div>
 
     <div class="tab-panel" id="panel-log">
       <div id="log-filter">
-        <button class="log-filter-btn active" data-lf="all">전체</button>
-        <button class="log-filter-btn" data-lf="0">캐릭터1</button>
-        <button class="log-filter-btn" data-lf="1">캐릭터2</button>
-        <button class="log-filter-btn" data-lf="fail">실패</button>
+        <button class="log-filter-btn active" data-lf="all" data-i18n="log.all">전체</button>
+        <button class="log-filter-btn" data-lf="0" data-i18n="set.tabC0">캐릭터1</button>
+        <button class="log-filter-btn" data-lf="1" data-i18n="set.tabC1">캐릭터2</button>
+        <button class="log-filter-btn" data-lf="fail" data-i18n="log.fail">실패</button>
       </div>
-      <div id="log-list"><div class="log-empty">아직 대사가 없어요</div></div>
+      <div id="log-list"><div class="log-empty" data-i18n="log.empty">아직 대사가 없어요</div></div>
     </div>
 
-    <div class="tab-panel" id="panel-diary"><div id="diary-list"><div class="log-empty">아직 일기가 없어요 📔</div></div></div>
+    <div class="tab-panel" id="panel-diary"><div id="diary-list"><div class="log-empty" data-i18n="diary.empty">아직 일기가 없어요 📔</div></div></div>
 
     <div class="tab-panel" id="panel-achv"><div id="achv-count"></div><div id="achv-list"></div></div>
 
     <div class="tab-panel" id="panel-data">
       <div class="set-section">
-        <span class="set-label">📦 백업</span>
+        <span class="set-label" data-i18n="data.backup">📦 백업</span>
         <div class="preset-btns">
-          <button class="data-btn" id="btn-export">⬇ 내보내기</button>
-          <button class="data-btn" id="btn-import">⬆ 가져오기</button>
+          <button class="data-btn" id="btn-export" data-i18n="data.export">⬇ 내보내기</button>
+          <button class="data-btn" id="btn-import" data-i18n="data.import">⬆ 가져오기</button>
         </div>
         <input type="file" id="import-file" accept=".json,application/json" hidden>
-        <div class="set-note">스탯·업적·일기·대사 풀·이미지를 파일 하나로 저장하고 불러와요.<br>
+        <div class="set-note" data-i18n="data.note">스탯·업적·일기·대사 풀·이미지를 파일 하나로 저장하고 불러와요.<br>
           웹판 데이터 옮기기: 웹판 데스크펫 창에서 F12 → Console에 아래 줄을 붙여넣고 Enter → 복사된 내용을 .json 파일로 저장해서 가져오기.</div>
         <input class="set-input" readonly onclick="this.select()"
           value="copy(JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter(k=>k.startsWith('deskpet')).map(k=>[k,localStorage.getItem(k)]))))">
       </div>
       <hr class="divider">
       <div class="set-section">
-        <span class="set-label">🔄 초기화 <small>(이미지는 유지)</small></span>
-        <button class="data-btn danger" id="btn-reset">🗑️ 데이터 초기화</button>
+        <span class="set-label" data-i18n="data.reset">🔄 초기화 <small>(이미지는 유지)</small></span>
+        <button class="data-btn danger" id="btn-reset" data-i18n="data.resetBtn">🗑️ 데이터 초기화</button>
       </div>
       <div class="set-note" id="data-msg"></div>
     </div>
@@ -576,20 +586,20 @@ body.mode-pool { background: var(--cream); height: 100vh; overflow: hidden; }
     <div class="pl-right">
       <div class="pl-head">
         <b id="pl-title"></b>
-        <button class="pl-small" id="pl-clear-trig">이 상황 비우기</button>
+        <button class="pl-small" id="pl-clear-trig" data-i18n="pool.clearTrig">이 상황 비우기</button>
       </div>
       <div id="pl-lines"></div>
       <div class="pl-addrow">
-        <input class="set-input" id="pl-new" placeholder="직접 대사 추가 (Enter)" maxlength="60">
-        <button class="data-btn" id="pl-add" style="flex:none;width:60px">추가</button>
+        <input class="set-input" id="pl-new" data-i18n-ph="pool.newPh" placeholder="직접 대사 추가 (Enter)" maxlength="60">
+        <button class="data-btn" id="pl-add" style="flex:none;width:60px" data-i18n="pool.add">추가</button>
       </div>
     </div>
   </div>
   <div class="pl-bottom">
-    <button class="data-btn" id="pl-ai">🤖 AI로 채우기 <small>(상황마다 +3)</small></button>
-    <button class="data-btn danger" id="pl-clear-all" style="flex:none;width:110px">전부 비우기</button>
+    <button class="data-btn" id="pl-ai" data-i18n="pool.ai">🤖 AI로 채우기 <small>(상황마다 +3)</small></button>
+    <button class="data-btn danger" id="pl-clear-all" style="flex:none;width:110px" data-i18n="pool.clearAll">전부 비우기</button>
   </div>
-  <div class="set-note" id="pl-note">▶ 누르면 펫이 그 대사를 말해봐요. 대사를 고치고 Enter 또는 칸 밖을 누르면 저장돼요. 비워서 저장하면 삭제돼요.</div>
+  <div class="set-note" id="pl-note" data-i18n="pool.help">▶ 누르면 펫이 그 대사를 말해봐요. 대사를 고치고 Enter 또는 칸 밖을 누르면 저장돼요. 비워서 저장하면 삭제돼요.</div>
 </div>
 
 <script>
@@ -634,6 +644,279 @@ function openSettings() {
 }
 </script>
 <script>
+/* ============================================================================
+   다국어 (한국어 / English)
+   - 언어는 localStorage 'deskpet_lang'. 없으면 시스템 언어가 한국어면 ko, 아니면 en
+   - HTML 고정 문구: 한국어는 그대로 두고, 영어일 때만 data-i18n* 키로 바꿔 끼움
+   - JS 문구: t('키', {변수}) — 값이 함수면 변수를 넣어 호출 (한국어 조사 처리용)
+   ============================================================================ */
+const LANG_KEY = 'deskpet_lang';
+const LANG = (() => {
+  const v = (() => { try { return localStorage.getItem(LANG_KEY); } catch { return null; } })();
+  if (v === 'ko' || v === 'en') return v;
+  return (navigator.language || 'ko').toLowerCase().startsWith('ko') ? 'ko' : 'en';
+})();
+document.documentElement.lang = LANG;
+
+// 받침 유무로 조사 고르기: 이/가, 으로/로 …
+function josa(word, withB, withoutB) {
+  const c = (word || '').charCodeAt((word || '').length - 1);
+  if (!(c >= 0xAC00 && c <= 0xD7A3)) return withB + '(' + withoutB + ')';
+  return (c - 0xAC00) % 28 ? withB : withoutB;
+}
+
+const I18N = {
+  ko: {
+    appName: '데스크펫',
+    'stage.baby': '아기', 'stage.child': '어린이', 'stage.teen': '청소년', 'stage.adult': '어른',
+    ageDays: v => `${v.n}일`,
+    defName0: '캐릭터1', defName1: '캐릭터2',
+    'aff.0': ['😒 서먹서먹', '서로 어색하고 말이 없음'],
+    'aff.200': ['🙂 아는 사이', '가끔 말 걸지만 아직 서먹함'],
+    'aff.400': ['😊 친구', '편하게 지내는 사이'],
+    'aff.600': ['😄 친한 친구', '서로 잘 챙겨주고 자주 이야기함'],
+    'aff.800': ['💕 베스트프렌드', '뭐든 같이하고 싶은 단짝'],
+    achv: {
+      first_name: ['첫 만남', '캐릭터 이름을 처음 설정했어요'], first_image: ['내 모습이야', '캐릭터 이미지를 업로드했어요'],
+      first_feed: ['첫 밥', '처음으로 밥을 줬어요'], feed_50: ['집밥의 왕', '밥을 50번 줬어요'],
+      first_play: ['놀자!', '처음으로 같이 놀았어요'], play_30: ['놀이왕', '놀아주기 30번 달성'],
+      first_clean: ['첫 목욕', '처음으로 씻겨줬어요'], clean_100: ['청결왕', '청결 100을 달성했어요'],
+      medicine_10: ['건강제일', '약을 10번 줬어요'], health_7days: ['무적', '건강 100을 7일 유지했어요'],
+      day_7: ['7일', '함께한 지 7일이 됐어요'], day_30: ['30일', '함께한 지 30일이 됐어요'], day_100: ['100일', '함께한 지 100일이 됐어요'],
+      grow_child: ['첫 성장', '어린이로 성장했어요'], grow_teen: ['쑥쑥', '청소년으로 성장했어요'], grow_adult: ['다 컸어요', '어른이 됐어요'],
+      two_chars: ['첫 친구', '캐릭터를 2마리로 늘렸어요'], affinity_80: ['단짝', '호감도 800을 달성했어요'],
+      affinity_100: ['베프', '호감도 1000을 달성했어요'], night_owl: ['올빼미', '자정~새벽 4시에 접속했어요'],
+    },
+    triggers: {
+      greeting: '첫 인사', feed: '밥 먹음', play: '같이 놀기', pet: '쓰다듬기', clean: '목욕', medicine: '약 먹음',
+      wakeup: '잠에서 깸', idle: '혼잣말', hungry: '배고픔 호소', sleepy: '졸림', sick: '아픔', click: '클릭 반응',
+      interact: '친구에게 말걸기', gift: '선물 주고받기', kiss: '뽀뽀함', date: '데이트 중',
+    },
+    fallbacks: {
+      idle: ['오늘도 같이 있어줘서 고마워요 😊', '배고프다...', '낮잠 자고 싶어~', '뭐 하고 있어요?', '히히~ 😄', '오늘 날씨 좋다!'],
+      click: ['안녕! 😊', '왜 눌러요~ 😳', '히히 간지러워요!', '또 눌렀어요?'],
+      hungry: ['배고파요... 🍎 밥 주세요!', '꼬르륵... 😫', '배고파 죽겠어요 🍎'],
+      sleepy: ['졸려요... 💤 재워주세요~', '눈이 감겨요 😴', '자고 싶어요... 💤'],
+      sick: ['몸이 안 좋아요... 💊', '아파요 😢', '약 주세요 💊'],
+      feed: ['냠냠! 맛있어요 😋', '감사해요 🍎', '배부르다~ 😊'],
+      play: ['같이 놀아요~ 🎾', '신나요! 😄', '재밌다 히히~'],
+      pet: ['좋아요~ ✨', '기분 최고! 😊', '더 해줘요~'],
+      clean: ['깨끗해졌어요! ✨', '상쾌해요 🛁', '감사해요~'],
+      medicine: ['쓴데... 고마워요 💊', '건강해질게요!', '으... 써요 😣'],
+      wakeup: ['잘 잤어요~ ☀️', '좋은 아침이에요! 😊', '일어났어요~'],
+      greeting: ['안녕하세요~ 😊', '반가워요! 🎉', '오늘도 잘 부탁해요~'],
+      interact: ['같이 있으니 좋아요 💕', '행복해요 ✨', '친구가 있어서 다행이에요~'],
+      gift: ['선물이에요! 받아줘요 🎁', '고마워요! 기뻐요 🎁', '소중히 할게요 💛'],
+      kiss: ['💋 ...부끄러워요', '두근두근해요 💕', '...행복해요 💋'],
+      date: ['데이트 너무 좋아요 🌸', '같이 있고 싶어요 💕', '행복한 시간이에요 ✨'],
+    },
+    dateNames: ['봄 소풍 🌸', '노을 데이트 🌇', '별 보러 가기 🌙'],
+    lines: {
+      asleep: ['지금 자고 있어요... 💤'], full: ['배불러요! 🍎'], tooSleepy: ['졸려서 못 놀아요 😴'],
+      healthy: ['지금은 건강해요! 😊'], bored: ['심심해요 😢'], dirty: ['씻고 싶어요... 🛁'],
+      sleepStart: ['Zzz... 💤'], dating: ['이미 데이트 중이에요 🌸'], newImage: ['안녕! 잘 부탁해요 🎉'],
+      guard: ['쉿... 자고 있어 🤫', '푹 자~ 💤', '깨우면 안 되지...'],
+      awk0: ['...', '으...어색해', '흠...'], awk1: ['...', '뭐야...', '어색하다'],
+      nuzzleSleep: ['음냐... 💤', '으음... 조금만 더...', '...쿨쿨'],
+      wokenAngry: ['으악! 왜 깨워 💢', '깜짝이야...!', '자고 있었잖아 😠'],
+      bumpAngry: ['아야! 💢', '뭐야...!', '조심해!'], bumpFun: ['히히 부딪혔다 😆', '앗 깜짝이야~', '장난치지 마~ 😝'],
+      sleepingOther: ['...자네', '흠, 자고 있잖아'], meetAwk: ['...', '으...어색해', '저리 가...'],
+      meetShy: ['...안녕?', '어, 왔어?', '뭐 해?'],
+    },
+    achvBanner: v => `🏆 업적 달성!<br>${v.emoji} ${v.name}`,
+    achvNotifyTitle: '🏆 업적 달성!',
+    grew: v => `${v.emoji} ${v.name}${josa(v.name, '이', '가')} ${v.stage}${josa(v.stage, '으로', '로')} 성장했어요!`,
+    dateBanner: v => `🌸 ${v.name} 중...`,
+    needCare: v => `${v.name}${josa(v.name, '이', '가')} 돌봄이 필요해요! (${v.stats})`,
+    speedOn: '[테스트] 시간 20배속 ⏩', speedOff: '[테스트] 정상 속도',
+    imgTooBig: '이미지가 너무 커서 저장하지 못했어요. 더 작은 이미지를 써주세요.',
+    logSaved: v => `[트리거 ${v.n}개 저장됨]`, logBatch: v => `배치: ${v.msg}`, logDiaryFail: '(생성 실패)', logNoResp: '응답 없음',
+    logPoolGen: v => `[대사 풀 창에서 ${v.n}개 생성]`, logAll: '[전체]', logDiary: '[일기]',
+    diaryFallback: v => `오늘은 ${v.mood} 하루였어요. ${v.feed > 0 ? `밥을 ${v.feed}번 먹었어요 🍎 ` : ''}${v.play > 0 ? `${v.play}번이나 같이 놀았어요 🎾 ` : ''}내일도 좋은 하루가 되길 바라요 😊`,
+    'mood.happy': '행복한', 'mood.hungry': '배고팠던', 'mood.sick': '몸이 안 좋았던', 'mood.calm': '평온한',
+    'statE.hunger': '🍎 밥', 'statE.happy': '😊 기분', 'statE.energy': '⚡ 체력', 'statE.clean': '🛁 청결', 'statE.health': '❤️ 건강',
+    // 화면
+    wake: '깨우기', sleep: '재우기', wakeE: '☀️ 깨우기', sleepE: '💤 재우기',
+    minLater: v => `${v.n}분 후`, minShort: v => `${v.n}분`,
+    needAff: v => `호감도 ${v.n} 이상이 되면 할 수 있어요`, cooldown: v => `${v.n}분 뒤에 다시 할 수 있어요`,
+    petTip: '클릭: 반응 · 우클릭: 이미지 넣기', imgHint: '💡 펫을 우클릭하면 캐릭터 이미지를 넣을 수 있어요',
+    capFail: v => `캡처 실패: ${v.msg}`, capSaved: '📷 스크린샷을 저장했어요 (다운로드 폴더)', capCopied: '📋 클립보드에 복사했어요',
+    capSavedApp: '📷 사진\\DeskPet 폴더에 저장했어요', capSavedMac: '📷 사진/DeskPet 폴더에 저장했어요',
+    shotFail: v => `스크린샷 실패: ${v.msg}`, copyFail: v => `복사 실패: ${v.msg}`,
+    // 설정
+    notifyWin: '(윈도우 알림으로 와요)', notifyMac: '(맥 알림으로 와요)',
+    autoWin: '윈도우를 켤 때 데스크펫도 같이 켜기', autoMac: '맥에 로그인할 때 데스크펫도 같이 켜기',
+    sec: v => `${v.n}초`, untilNext: '다음 대사까지', saved: '✅ 저장됐어요!', imgHas: '✅ 이미지 있음 (클릭해서 변경)',
+    diaryDate: v => `📔 ${v.name} · ${v.day}일째 · ${v.date}`, logTrigger: v => `상황: ${v.t}`, logNone: '(없음)',
+    exported: '✅ 내보냈어요 (다운로드 폴더)', importBad: '백업 파일을 읽을 수 없어요.', importNotDp: '데스크펫 백업 파일이 아니에요.',
+    importConfirm: '지금 데이터를 백업 파일 내용으로 바꿀까요?\n현재 스탯·업적·일기·대사 풀·이미지가 모두 교체돼요.',
+    imported: '✅ 가져왔어요!', resetConfirm: '⚠️ 정말 초기화할까요?\n스탯, 업적, 일기, 대사 풀이 모두 삭제돼요.\n이미지는 유지돼요.',
+    resetDone: '✅ 초기화했어요!', applying: '⏳ 적용 중...',
+    langConfirm: '언어를 바꿀까요?\n\n지금까지 모인 AI 대사 풀도 비울까요? (새 대사가 새 언어로 만들어져요)\n[확인] 비우고 바꾸기 · [취소] 대사는 두고 바꾸기',
+    // 대사 풀
+    poolTotal: v => `총 ${v.n}개 · 상황마다 최대 ${v.max}개`, poolEmpty: '저장된 AI 대사가 없어서 아래 기본 대사가 나와요',
+    poolSayTip: '펫이 말해보기', poolDelTip: '삭제', poolEdited: '✏️ 고쳤어요', poolDeleted: '🗑️ 지웠어요', poolSaid: '▶ 펫에게 말하게 했어요',
+    poolDup: '이미 있는 대사예요', poolAdded: '➕ 추가했어요',
+    poolClearTrigQ: v => `"${v.t}" 대사를 모두 지울까요?\n(비어 있으면 기본 대사가 나와요)`, poolCleared: '비웠어요',
+    poolClearAllQ: v => `${v.name}의 대사 풀을 전부 지울까요?\nAPI 키가 있으면 나중에 다시 자동으로 채워져요.`, poolClearedAll: '전부 비웠어요',
+    poolNeedKey: '⚠️ 설정 → 공통에서 Gemini API 키를 먼저 넣어주세요', poolMaking: '🤖 만드는 중... (10~20초)',
+    poolMade: v => `✅ ${v.n}개 추가했어요`, poolFail: '실패',
+    pageSettings: '⚙ 설정 — 데스크펫', pagePool: '💬 대사 풀 — 데스크펫',
+  },
+
+  en: {
+    appName: 'DeskPet',
+    'stage.baby': 'Baby', 'stage.child': 'Kid', 'stage.teen': 'Teen', 'stage.adult': 'Adult',
+    ageDays: v => `Day ${v.n}`,
+    defName0: 'Pet 1', defName1: 'Pet 2',
+    'aff.0': ['😒 Awkward', 'Awkward with each other and barely talk'],
+    'aff.200': ['🙂 Acquaintances', 'Talk sometimes but still a bit shy'],
+    'aff.400': ['😊 Friends', 'Comfortable around each other'],
+    'aff.600': ['😄 Close friends', 'Look out for each other and chat often'],
+    'aff.800': ['💕 Best friends', 'Want to do everything together'],
+    achv: {
+      first_name: ['First Hello', 'Named your pet for the first time'], first_image: ['That\'s Me!', 'Uploaded a pet image'],
+      first_feed: ['First Meal', 'Fed your pet for the first time'], feed_50: ['Home Chef', 'Fed your pet 50 times'],
+      first_play: ['Let\'s Play!', 'Played together for the first time'], play_30: ['Playmaker', 'Played 30 times'],
+      first_clean: ['First Bath', 'Gave the first bath'], clean_100: ['Squeaky Clean', 'Reached 100 cleanliness'],
+      medicine_10: ['Health First', 'Gave medicine 10 times'], health_7days: ['Invincible', 'Kept health at 100 for 7 days'],
+      day_7: ['7 Days', 'Together for 7 days'], day_30: ['30 Days', 'Together for 30 days'], day_100: ['100 Days', 'Together for 100 days'],
+      grow_child: ['Growing Up', 'Grew into a kid'], grow_teen: ['Shooting Up', 'Grew into a teen'], grow_adult: ['All Grown Up', 'Became an adult'],
+      two_chars: ['First Friend', 'Adopted a second pet'], affinity_80: ['Besties', 'Reached 800 friendship'],
+      affinity_100: ['Soulmates', 'Reached 1000 friendship'], night_owl: ['Night Owl', 'Played between midnight and 4 AM'],
+    },
+    triggers: {
+      greeting: 'Greeting', feed: 'Eating', play: 'Playing', pet: 'Being petted', clean: 'Bath time', medicine: 'Taking medicine',
+      wakeup: 'Waking up', idle: 'Talking to self', hungry: 'Hungry', sleepy: 'Sleepy', sick: 'Feeling sick', click: 'Clicked',
+      interact: 'Talking to friend', gift: 'Gift exchange', kiss: 'Kiss', date: 'On a date',
+    },
+    fallbacks: {
+      idle: ['Thanks for hanging out with me 😊', 'Kinda hungry...', 'Nap time~?', 'Whatcha doing?', 'Hehe~ 😄', 'Nice day today!'],
+      click: ['Hi there! 😊', 'Why\'d you poke me~ 😳', 'Hehe that tickles!', 'Again?'],
+      hungry: ['So hungry... 🍎 Feed me!', '*tummy rumbles* 😫', 'Starving over here 🍎'],
+      sleepy: ['Sleepy... 💤 Tuck me in~', 'My eyes are closing 😴', 'I wanna sleep... 💤'],
+      sick: ['I don\'t feel good... 💊', 'It hurts 😢', 'Medicine, please 💊'],
+      feed: ['Yum! So good 😋', 'Thank you 🍎', 'So full~ 😊'],
+      play: ['Let\'s play~ 🎾', 'So fun! 😄', 'Hehe that was great~'],
+      pet: ['That feels nice~ ✨', 'Best mood ever! 😊', 'More please~'],
+      clean: ['All clean! ✨', 'So fresh 🛁', 'Thank you~'],
+      medicine: ['Bitter... but thanks 💊', 'I\'ll get better!', 'Ugh... bitter 😣'],
+      wakeup: ['Slept well~ ☀️', 'Good morning! 😊', 'I\'m up~'],
+      greeting: ['Hello~ 😊', 'Nice to see you! 🎉', 'Let\'s have a good day~'],
+      interact: ['I like being together 💕', 'So happy ✨', 'Glad you\'re here~'],
+      gift: ['A gift for you! 🎁', 'Thank you! I love it 🎁', 'I\'ll treasure it 💛'],
+      kiss: ['💋 ...so embarrassing', 'My heart is racing 💕', '...so happy 💋'],
+      date: ['I love our dates 🌸', 'Wanna stay together 💕', 'Such a happy time ✨'],
+    },
+    dateNames: ['Spring picnic 🌸', 'Sunset date 🌇', 'Stargazing 🌙'],
+    lines: {
+      asleep: ['Sleeping right now... 💤'], full: ['I\'m full! 🍎'], tooSleepy: ['Too sleepy to play 😴'],
+      healthy: ['I feel fine right now! 😊'], bored: ['So bored 😢'], dirty: ['I want a bath... 🛁'],
+      sleepStart: ['Zzz... 💤'], dating: ['We\'re already on a date 🌸'], newImage: ['Hi! Nice to meet you 🎉'],
+      guard: ['Shh... they\'re asleep 🤫', 'Sleep tight~ 💤', 'Mustn\'t wake them...'],
+      awk0: ['...', 'Um... awkward', 'Hmm...'], awk1: ['...', 'What...', 'So awkward'],
+      nuzzleSleep: ['Mmh... 💤', 'Five more minutes...', '...zzz'],
+      wokenAngry: ['Hey! Why\'d you wake me 💢', 'Whoa, you scared me!', 'I was sleeping 😠'],
+      bumpAngry: ['Ouch! 💢', 'What the...!', 'Watch it!'], bumpFun: ['Hehe, bonk 😆', 'Whoa, surprise~', 'Quit messing around~ 😝'],
+      sleepingOther: ['...they\'re asleep', 'Hmm, sleeping'], meetAwk: ['...', 'Um... awkward', 'Go away...'],
+      meetShy: ['...hi?', 'Oh, you\'re here?', 'Whatcha doing?'],
+    },
+    achvBanner: v => `🏆 Achievement!<br>${v.emoji} ${v.name}`,
+    achvNotifyTitle: '🏆 Achievement unlocked!',
+    grew: v => `${v.emoji} ${v.name} grew into a ${v.stage.toLowerCase()}!`,
+    dateBanner: v => `🌸 ${v.name}...`,
+    needCare: v => `${v.name} needs some care! (${v.stats})`,
+    speedOn: '[Test] Time ×20 ⏩', speedOff: '[Test] Normal speed',
+    imgTooBig: 'That image is too large to save. Please use a smaller one.',
+    logSaved: v => `[Saved ${v.n} lines]`, logBatch: v => `Batch: ${v.msg}`, logDiaryFail: '(failed)', logNoResp: 'No response',
+    logPoolGen: v => `[Generated ${v.n} in Dialogue Pool]`, logAll: '[All]', logDiary: '[Diary]',
+    diaryFallback: v => `Today was a ${v.mood} day. ${v.feed > 0 ? `I ate ${v.feed} time${v.feed > 1 ? 's' : ''} 🍎 ` : ''}${v.play > 0 ? `We played ${v.play} time${v.play > 1 ? 's' : ''} 🎾 ` : ''}Hope tomorrow is great too 😊`,
+    'mood.happy': 'happy', 'mood.hungry': 'hungry', 'mood.sick': 'rough', 'mood.calm': 'calm',
+    'statE.hunger': '🍎 Food', 'statE.happy': '😊 Mood', 'statE.energy': '⚡ Energy', 'statE.clean': '🛁 Clean', 'statE.health': '❤️ Health',
+    wake: 'Wake up', sleep: 'Sleep', wakeE: '☀️ Wake', sleepE: '💤 Sleep',
+    minLater: v => `in ${v.n}m`, minShort: v => `${v.n}m`,
+    needAff: v => `Unlocks at ${v.n} friendship`, cooldown: v => `Available again in ${v.n} min`,
+    petTip: 'Click: react · Right-click: set image', imgHint: '💡 Right-click a pet to set its image',
+    capFail: v => `Capture failed: ${v.msg}`, capSaved: '📷 Screenshot saved (Downloads)', capCopied: '📋 Copied to clipboard',
+    capSavedApp: '📷 Saved to Pictures\\DeskPet', capSavedMac: '📷 Saved to Pictures/DeskPet',
+    shotFail: v => `Screenshot failed: ${v.msg}`, copyFail: v => `Copy failed: ${v.msg}`,
+    notifyWin: '(sent as Windows notifications)', notifyMac: '(sent as macOS notifications)',
+    autoWin: 'Start DeskPet when Windows starts', autoMac: 'Start DeskPet when you log in',
+    sec: v => `${v.n}s`, untilNext: 'Until next line', saved: '✅ Saved!', imgHas: '✅ Image set (click to change)',
+    diaryDate: v => `📔 ${v.name} · Day ${v.day} · ${v.date}`, logTrigger: v => `Situation: ${v.t}`, logNone: '(none)',
+    exported: '✅ Exported (Downloads)', importBad: 'Couldn\'t read the backup file.', importNotDp: 'This isn\'t a DeskPet backup file.',
+    importConfirm: 'Replace your current data with this backup?\nStats, achievements, diary, dialogue pool and images will all be replaced.',
+    imported: '✅ Imported!', resetConfirm: '⚠️ Really reset?\nStats, achievements, diary and dialogue pool will be deleted.\nImages are kept.',
+    resetDone: '✅ Reset done!', applying: '⏳ Applying...',
+    langConfirm: 'Change language?\n\nAlso clear the AI dialogue pool so new lines are generated in the new language?\n[OK] Clear and switch · [Cancel] Keep lines and switch',
+    poolTotal: v => `${v.n} total · up to ${v.max} per situation`, poolEmpty: 'No AI lines saved, so these default lines are used',
+    poolSayTip: 'Make the pet say it', poolDelTip: 'Delete', poolEdited: '✏️ Updated', poolDeleted: '🗑️ Deleted', poolSaid: '▶ Your pet said it',
+    poolDup: 'That line already exists', poolAdded: '➕ Added',
+    poolClearTrigQ: v => `Delete all lines for "${v.t}"?\n(Default lines will be used when empty)`, poolCleared: 'Cleared',
+    poolClearAllQ: v => `Delete ${v.name}'s entire dialogue pool?\nIf you have an API key, it will refill automatically later.`, poolClearedAll: 'All cleared',
+    poolNeedKey: '⚠️ Add a Gemini API key first in Settings → General', poolMaking: '🤖 Generating... (10–20s)',
+    poolMade: v => `✅ Added ${v.n} lines`, poolFail: 'Failed',
+    pageSettings: '⚙ Settings — DeskPet', pagePool: '💬 Dialogue Pool — DeskPet',
+
+    // ---- HTML 고정 문구 (영어일 때만 교체) ----
+    'tb.shot': 'Save screenshot', 'tb.copy': 'Copy to clipboard', 'tb.set': 'Settings', 'tb.pin': 'Always on top', 'tb.min': 'Minimize', 'tb.close': 'Quit',
+    'room.addTitle': 'Add a second pet', 'room.add': '<b>＋</b>Friend',
+    'stat.hunger': 'Food', 'stat.happy': 'Mood', 'stat.energy': 'Energy', 'stat.clean': 'Clean', 'stat.health': 'Health',
+    'act.feed': 'Feed', 'act.play': 'Play', 'act.sleep': 'Sleep', 'act.clean': 'Bath', 'act.medicine': 'Medicine', 'act.pet': 'Pet', 'act.special': 'Special events',
+    'win.toFree': 'Free Mode', 'win.toFreeTitle': 'Let your pets roam the desktop',
+    'sp.gift': '🎁 Gift', 'sp.kiss': '💋 Kiss', 'sp.date': '🌸 Date',
+    'actE.feed': '🍎 Feed', 'actE.play': '🎾 Play', 'actE.clean': '🛁 Bath', 'actE.medicine': '💊 Medicine', 'actE.pet': '✨ Pet',
+    'free.toWindow': '🏠 Window', 'free.settings': '⚙ Settings', 'free.quit': 'Quit',
+    'set.title': '⚙ Settings — DeskPet', 'set.tabCommon': 'General', 'set.tabC0': 'Pet 1', 'set.tabC1': 'Pet 2',
+    'set.tabLog': '📜 Log', 'set.tabDiary': '📔 Diary', 'set.tabAchv': '🏆 Achievements', 'set.tabData': '💾 Data',
+    'set.size': '📏 Window size', 'set.sizeS': 'S', 'set.sizeM': 'M', 'set.sizeL': 'L',
+    'set.decay': '⏱ Needs decay speed',
+    'set.ps.vslow': '🐢<br>Very relaxed', 'set.ps.slow': '🌱<br>Relaxed', 'set.ps.normal': '🌿<br>Normal', 'set.ps.fast': '🔥<br>Demanding',
+    'set.day': '📅 Day length <small>(counted while the app is running)</small>',
+    'set.ds.slow': '🐌<br>24 hours', 'set.ds.normal': '🌿<br>4 hours', 'set.ds.fast': '⚡<br>1 hour',
+    'set.apikey': '🔑 Gemini API key <small>(free · aistudio.google.com)</small>', 'set.openPool': '💬 View · edit dialogue pool',
+    'set.relation': '💞 Relationship between pets <small>(auto from friendship if empty)</small>',
+    'set.relationPh': 'e.g. Childhood friends. They bicker but secretly adore each other.',
+    'set.notify': '🔔 Notifications', 'set.notifyOn': 'Enable notifications', 'set.threshold': 'Alert below:',
+    'set.interval': 'Minimum interval:', 'set.min': ' min', 'set.notifyStats': 'Stats to watch',
+    'set.permDenied': '⚠️ Notification permission was denied.',
+    'set.autostart': '🚀 Launch at startup <small>(applies immediately)</small>',
+    'set.bubbleDur': '💬 Speech bubble duration <small>(Free Mode)</small>:', 'set.save': '💾 Save',
+    'set.name': '🏷️ Name', 'set.name0Ph': 'Pet 1 name...', 'set.name1Ph': 'Pet 2 name...',
+    'set.persona': '✨ Personality <small>(used for AI dialogue)</small>',
+    'set.persona0Ph': 'e.g. Energetic, loves snacks, sleeps a lot.', 'set.persona1Ph': 'e.g. Quiet and calm, loves reading.',
+    'set.image0': '🖼️ Image <small>(or right-click the pet in the pet window)</small>', 'set.image': '🖼️ Image', 'set.upload': '🐾 Click to upload',
+    'log.all': 'All', 'log.fail': 'Failed', 'log.empty': 'No dialogue yet', 'diary.empty': 'No diary entries yet 📔',
+    'data.backup': '📦 Backup', 'data.export': '⬇ Export', 'data.import': '⬆ Import',
+    'data.note': 'Save and restore stats, achievements, diary, dialogue pool and images as a single file.<br>Moving from the web version: in the web DeskPet window press F12 → Console, paste the line below and press Enter, then save the copied text as a .json file and import it.',
+    'data.reset': '🔄 Reset <small>(images are kept)</small>', 'data.resetBtn': '🗑️ Reset data',
+    'pool.clearTrig': 'Clear this situation', 'pool.newPh': 'Add your own line (Enter)', 'pool.add': 'Add',
+    'pool.ai': '🤖 Fill with AI <small>(+3 per situation)</small>', 'pool.clearAll': 'Clear all',
+    'pool.help': '▶ makes your pet say the line. Edit a line and press Enter or click outside to save. Save it empty to delete.',
+  },
+};
+
+// 영어에 없는 키는 한국어로 (빠진 번역이 있어도 빈칸이 되지 않게)
+function t(key, vars) {
+  let v = I18N[LANG][key];
+  if (v === undefined) v = I18N.ko[key];
+  if (v === undefined) return key;
+  return typeof v === 'function' ? v(vars || {}) : v;
+}
+const tl = key => I18N[LANG][key] ?? I18N.ko[key];   // 배열·객체 그대로
+
+// HTML 고정 문구 교체 (영어일 때만)
+function applyI18n(root = document) {
+  document.title = '🐾 ' + t('appName');
+  if (LANG === 'ko') return;
+  const en = I18N.en;
+  root.querySelectorAll('[data-i18n]').forEach(el => { const v = en[el.dataset.i18n]; if (typeof v === 'string') el.innerHTML = v; });
+  root.querySelectorAll('[data-i18n-title]').forEach(el => { const v = en[el.dataset.i18nTitle]; if (typeof v === 'string') el.title = v; });
+  root.querySelectorAll('[data-i18n-ph]').forEach(el => { const v = en[el.dataset.i18nPh]; if (typeof v === 'string') el.placeholder = v; });
+}
+applyI18n();
+// 앱(C#/Swift)에도 언어를 알려서 트레이·메뉴바 메뉴, 창 제목을 맞추게 함
+if (typeof post === 'function') post({ type: 'lang', value: LANG });
 /* ============================================================================
    공용: 저장소 (키·구조는 웹판 deskpet.html과 동일 → 백업 호환)
    ============================================================================ */
@@ -684,10 +967,10 @@ const PRESETS = {
 const DAY_SPEEDS = { slow: 86400000, normal: 14400000, fast: 3600000 };
 
 const GROWTH_STAGES = [
-  { id: 'baby',  label: '아기',   emoji: '🥚', minAge: 0,  minCare: 0,   scale: 0.60 },
-  { id: 'child', label: '어린이', emoji: '🌱', minAge: 7,  minCare: 50,  scale: 0.75 },
-  { id: 'teen',  label: '청소년', emoji: '🌿', minAge: 20, minCare: 150, scale: 0.90 },
-  { id: 'adult', label: '어른',   emoji: '🌳', minAge: 40, minCare: 300, scale: 1.00 },
+  { id: 'baby', label: t('stage.baby'),   emoji: '🥚', minAge: 0,  minCare: 0,   scale: 0.60 },
+  { id: 'child', label: t('stage.child'), emoji: '🌱', minAge: 7,  minCare: 50,  scale: 0.75 },
+  { id: 'teen', label: t('stage.teen'), emoji: '🌿', minAge: 20, minCare: 150, scale: 0.90 },
+  { id: 'adult', label: t('stage.adult'),   emoji: '🌳', minAge: 40, minCare: 300, scale: 1.00 },
 ];
 function getStage(age, care) {
   let stage = GROWTH_STAGES[0];
@@ -696,13 +979,7 @@ function getStage(age, care) {
 }
 const stageById = id => GROWTH_STAGES.find(s => s.id === id) || GROWTH_STAGES[0];
 
-const AFFINITY_LABELS = [
-  [0,   '😒 서먹서먹',    '서로 어색하고 말이 없음'],
-  [200, '🙂 아는 사이',   '가끔 말 걸지만 아직 서먹함'],
-  [400, '😊 친구',        '편하게 지내는 사이'],
-  [600, '😄 친한 친구',   '서로 잘 챙겨주고 자주 이야기함'],
-  [800, '💕 베스트프렌드', '뭐든 같이하고 싶은 단짝'],
-];
+const AFFINITY_LABELS = [0, 200, 400, 600, 800].map(n => [n, ...tl('aff.' + n)]);
 function getAffinityLabel(v) {
   let r = AFFINITY_LABELS[0];
   for (const row of AFFINITY_LABELS) if (v >= row[0]) r = row;
@@ -710,53 +987,33 @@ function getAffinityLabel(v) {
 }
 
 const ACHIEVEMENTS = [
-  { id: 'first_name',   emoji: '🌱', name: '첫 만남',     desc: '캐릭터 이름을 처음 설정했어요' },
-  { id: 'first_image',  emoji: '🖼️', name: '내 모습이야', desc: '캐릭터 이미지를 업로드했어요' },
-  { id: 'first_feed',   emoji: '🍎', name: '첫 밥',       desc: '처음으로 밥을 줬어요' },
-  { id: 'feed_50',      emoji: '🍽️', name: '집밥의 왕',   desc: '밥을 50번 줬어요' },
-  { id: 'first_play',   emoji: '🎾', name: '놀자!',       desc: '처음으로 같이 놀았어요' },
-  { id: 'play_30',      emoji: '🎮', name: '놀이왕',      desc: '놀아주기 30번 달성' },
-  { id: 'first_clean',  emoji: '🛁', name: '첫 목욕',     desc: '처음으로 씻겨줬어요' },
-  { id: 'clean_100',    emoji: '✨', name: '청결왕',      desc: '청결 100을 달성했어요' },
-  { id: 'medicine_10',  emoji: '💊', name: '건강제일',    desc: '약을 10번 줬어요' },
-  { id: 'health_7days', emoji: '❤️', name: '무적',        desc: '건강 100을 7일 유지했어요' },
-  { id: 'day_7',        emoji: '🎂', name: '7일',         desc: '함께한 지 7일이 됐어요' },
-  { id: 'day_30',       emoji: '🎂', name: '30일',        desc: '함께한 지 30일이 됐어요' },
-  { id: 'day_100',      emoji: '🎂', name: '100일',       desc: '함께한 지 100일이 됐어요' },
-  { id: 'grow_child',   emoji: '🌱', name: '첫 성장',     desc: '어린이로 성장했어요' },
-  { id: 'grow_teen',    emoji: '🌿', name: '쑥쑥',        desc: '청소년으로 성장했어요' },
-  { id: 'grow_adult',   emoji: '🌳', name: '다 컸어요',   desc: '어른이 됐어요' },
-  { id: 'two_chars',    emoji: '👫', name: '첫 친구',     desc: '캐릭터를 2마리로 늘렸어요' },
-  { id: 'affinity_80',  emoji: '💕', name: '단짝',        desc: '호감도 800을 달성했어요' },
-  { id: 'affinity_100', emoji: '💯', name: '베프',        desc: '호감도 1000을 달성했어요' },
-  { id: 'night_owl',    emoji: '🌙', name: '올빼미',      desc: '자정~새벽 4시에 접속했어요' },
-];
+  { id: 'first_name',   emoji: '🌱', },
+  { id: 'first_image',  emoji: '🖼️', },
+  { id: 'first_feed',   emoji: '🍎', },
+  { id: 'feed_50',      emoji: '🍽️', },
+  { id: 'first_play',   emoji: '🎾', },
+  { id: 'play_30',      emoji: '🎮', },
+  { id: 'first_clean',  emoji: '🛁', },
+  { id: 'clean_100',    emoji: '✨', },
+  { id: 'medicine_10',  emoji: '💊', },
+  { id: 'health_7days', emoji: '❤️', },
+  { id: 'day_7',        emoji: '🎂', },
+  { id: 'day_30',       emoji: '🎂', },
+  { id: 'day_100',      emoji: '🎂', },
+  { id: 'grow_child',   emoji: '🌱', },
+  { id: 'grow_teen',    emoji: '🌿', },
+  { id: 'grow_adult',   emoji: '🌳', },
+  { id: 'two_chars',    emoji: '👫', },
+  { id: 'affinity_80',  emoji: '💕', },
+  { id: 'affinity_100', emoji: '💯', },
+  { id: 'night_owl',    emoji: '🌙', },
+].map(a => Object.assign(a, { name: tl('achv')[a.id][0], desc: tl('achv')[a.id][1] }));
 
-const TRIGGER_LABELS = {
-  greeting: '첫 인사', feed: '밥 먹음', play: '같이 놀기', pet: '쓰다듬기',
-  clean: '목욕', medicine: '약 먹음', wakeup: '잠에서 깸', idle: '혼잣말',
-  hungry: '배고픔 호소', sleepy: '졸림', sick: '아픔', click: '클릭 반응', interact: '친구에게 말걸기',
-  gift: '선물 주고받기', kiss: '뽀뽀함', date: '데이트 중',
-};
+const TRIGGER_LABELS = tl('triggers');
 
-const FALLBACKS = {
-  idle:     ['오늘도 같이 있어줘서 고마워요 😊', '배고프다...', '낮잠 자고 싶어~', '뭐 하고 있어요?', '히히~ 😄', '오늘 날씨 좋다!'],
-  click:    ['안녕! 😊', '왜 눌러요~ 😳', '히히 간지러워요!', '또 눌렀어요?'],
-  hungry:   ['배고파요... 🍎 밥 주세요!', '꼬르륵... 😫', '배고파 죽겠어요 🍎'],
-  sleepy:   ['졸려요... 💤 재워주세요~', '눈이 감겨요 😴', '자고 싶어요... 💤'],
-  sick:     ['몸이 안 좋아요... 💊', '아파요 😢', '약 주세요 💊'],
-  feed:     ['냠냠! 맛있어요 😋', '감사해요 🍎', '배부르다~ 😊'],
-  play:     ['같이 놀아요~ 🎾', '신나요! 😄', '재밌다 히히~'],
-  pet:      ['좋아요~ ✨', '기분 최고! 😊', '더 해줘요~'],
-  clean:    ['깨끗해졌어요! ✨', '상쾌해요 🛁', '감사해요~'],
-  medicine: ['쓴데... 고마워요 💊', '건강해질게요!', '으... 써요 😣'],
-  wakeup:   ['잘 잤어요~ ☀️', '좋은 아침이에요! 😊', '일어났어요~'],
-  greeting: ['안녕하세요~ 😊', '반가워요! 🎉', '오늘도 잘 부탁해요~'],
-  interact: ['같이 있으니 좋아요 💕', '행복해요 ✨', '친구가 있어서 다행이에요~'],
-  gift:     ['선물이에요! 받아줘요 🎁', '고마워요! 기뻐요 🎁', '소중히 할게요 💛'],
-  kiss:     ['💋 ...부끄러워요', '두근두근해요 💕', '...행복해요 💋'],
-  date:     ['데이트 너무 좋아요 🌸', '같이 있고 싶어요 💕', '행복한 시간이에요 ✨'],
-};
+const FALLBACKS = tl('fallbacks');
+const LINES = tl('lines');
+const DEFAULT_NAMES = ['캐릭터1', '캐릭터2', 'Pet 1', 'Pet 2'];   // 이름을 안 바꾼 상태 판별용 (언어 무관)
 const pickOne = a => a[Math.floor(Math.random() * a.length)];
 
 // 화면에 보이는 스탯. 저장값 sleep(졸음, 높을수록 나쁨)은 '체력'(= 100 - 졸음)으로 뒤집어 보여줌
@@ -766,7 +1023,7 @@ const statValue = (C, k) => k === 'energy' ? 100 - (C.sleep ?? 0) : (C[k] ?? 100
 const statBad = v => v < 20;
 
 function defChar(i) { return {
-  name: i === 0 ? '캐릭터1' : '캐릭터2', persona: '',
+  name: i === 0 ? t('defName0') : t('defName1'), persona: '',
   hunger: 80, happy: 80, sleep: 20, clean: 80, health: 100,
   asleep: false, playedMs: 0, age: 0,
   care: 0, stageId: 'baby',
@@ -791,12 +1048,6 @@ function sendPatch(patch) {
   jset(PATCH_KEY, q.slice(-20));
 }
 
-// 받침 유무로 조사 고르기: 이/가, 이랑/랑 …
-function josa(word, withB, withoutB) {
-  const c = (word || '').charCodeAt(word.length - 1);
-  if (!(c >= 0xAC00 && c <= 0xD7A3)) return withB + '(' + withoutB + ')';
-  return (c - 0xAC00) % 28 ? withB : withoutB;
-}
 const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 /* ============================================================================
@@ -826,15 +1077,21 @@ async function geminiCall(apiKey, prompt) {
     }
     const body = await res.text().catch(() => '');
     lastErr = new Error(`HTTP ${res.status} (${model}): ${body.slice(0, 120)}`);
-    // 이 모델을 못 쓰는 경우만 다음 모델로. 키 오류·한도 초과(429) 등은 바로 중단
-    const modelProblem = res.status === 404 || ((res.status === 400 || res.status === 403) && /model|not found|not supported|access/i.test(body));
-    if (!modelProblem) throw lastErr;
-    if (saved === model) localStorage.removeItem(MODEL_KEY);
+    // 다음 모델로 넘어가는 경우:
+    //  - 이 모델을 못 씀 (404, 모델 관련 400/403)
+    //  - 이 모델이 지금 붐빔 (503) / 서버 오류 (500)
+    //  - 이 모델의 무료 한도 초과 (429) — 무료 한도는 모델마다 따로라 다른 모델은 될 수 있음
+    // 키가 틀린 경우(모델과 무관한 400/401/403)는 다른 모델도 똑같이 실패하므로 바로 중단
+    const unavailable = res.status === 404 || ((res.status === 400 || res.status === 403) && /model|not found|not supported|access/i.test(body));
+    const busy = res.status === 503 || res.status === 500 || res.status === 429;
+    if (!unavailable && !busy) throw lastErr;
+    if (unavailable && saved === model) localStorage.removeItem(MODEL_KEY);   // 붐빈 건 일시적이라 기억은 유지
   }
   throw lastErr;
 }
 
 async function geminiAllTriggers({ apiKey, me, other, relation }) {
+  if (LANG === 'en') return geminiAllTriggersEn({ apiKey, me, other, relation });
   const mood = me.asleep ? '잠자는 중' : me.hunger < 25 ? '매우 배고픔' : me.happy < 25 ? '슬프고 외로움' : me.health < 30 ? '몸이 아픔' : me.sleep > 80 ? '매우 졸림' : me.happy > 80 ? '아주 행복함' : me.clean < 25 ? '더럽고 불쾌함' : '평온함';
   const interactCtx = other
     ? `\n\n"interact" 트리거 한정: 같이 있는 친구 "${other.name}"에게 말을 거는 상황.${relation ? ` 둘의 관계: ${relation}` : ''}`
@@ -862,6 +1119,7 @@ async function geminiAllTriggers({ apiKey, me, other, relation }) {
 }
 
 async function geminiDiary({ apiKey, me, other, day, summary, mood }) {
+  if (LANG === 'en') return geminiDiaryEn({ apiKey, me, other, day, summary, mood });
   const otherTxt = other ? `같이 있는 친구: "${other.name}". ` : '';
   const prompt =
 `너는 "${me.name}"이라는 이름의 귀여운 가상 캐릭터야.
@@ -871,6 +1129,46 @@ ${otherTxt}
 
 오늘 하루를 캐릭터 시점으로 짧은 일기로 써줘.
 3~4문장, 한국어, 이모지 포함, 귀엽고 자연스럽게. 날짜나 제목 없이 본문만.`;
+  return (await geminiCall(apiKey, prompt)) || null;
+}
+
+// 영어판 프롬프트 (한국어판과 같은 구조·같은 JSON 키)
+async function geminiAllTriggersEn({ apiKey, me, other, relation }) {
+  const mood = me.asleep ? 'sleeping' : me.hunger < 25 ? 'very hungry' : me.happy < 25 ? 'sad and lonely' : me.health < 30 ? 'feeling sick' : me.sleep > 80 ? 'very sleepy' : me.happy > 80 ? 'very happy' : me.clean < 25 ? 'dirty and grumpy' : 'calm';
+  const interactCtx = other
+    ? `\n\nFor the "interact" trigger only: talking to their friend "${other.name}".${relation ? ` Their relationship: ${relation}` : ''}`
+    : '';
+  const prompt =
+`You are a cute virtual pet character named "${me.name}".
+Personality: ${me.persona || 'cute and cheerful'}
+Current state: ${mood} (age: ${me.age} days)${interactCtx}
+
+For each situation below, write 3 short English lines with different vibes.
+Rules: each line has 1–2 emoji, is under 40 characters, and fits the personality.
+Important: except for "interact", never mention another character's name — talk to yourself.
+
+Output ONLY the JSON below. Each trigger is an array of 3 strings. No other text:
+{"greeting":["...","...","..."], "feed":["...","...","..."], "play":["...","...","..."], "pet":["...","...","..."], "clean":["...","...","..."], "medicine":["...","...","..."], "wakeup":["...","...","..."], "idle":["...","...","..."], "hungry":["...","...","..."], "sleepy":["...","...","..."], "sick":["...","...","..."], "click":["...","...","..."], "interact":["...","...","..."], "gift":["...","...","..."], "kiss":["...","...","..."], "date":["...","...","..."]}`;
+  const text = await geminiCall(apiKey, prompt);
+  if (!text) throw new Error('Empty response');
+  const clean = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+  try {
+    const obj = JSON.parse(clean);
+    if (typeof obj !== 'object' || Array.isArray(obj)) throw new Error('Bad JSON');
+    return obj;
+  } catch { throw new Error(`JSON parse failed: ${clean.slice(0, 100)}`); }
+}
+
+async function geminiDiaryEn({ apiKey, me, other, day, summary, mood }) {
+  const otherTxt = other ? `Friend living with you: "${other.name}". ` : '';
+  const prompt =
+`You are a cute virtual pet character named "${me.name}".
+Personality: ${me.persona || 'cute and cheerful'}
+${otherTxt}
+What happened today (day ${day}): ${summary}. Overall it was a ${mood} day.
+
+Write a short diary entry about today from the character's point of view.
+3–4 sentences, English, with emoji, cute and natural. Body text only — no date or title.`;
   return (await geminiCall(apiKey, prompt)) || null;
 }
 
@@ -894,6 +1192,8 @@ function createEngine() {
   });
   { const d = defCommon(); for (const k in d) if (D.common[k] === undefined) D.common[k] = d[k]; }
 
+  // 이름을 안 바꾼 기본 이름(캐릭터1 / Pet 1)은 현재 언어에 맞춤
+  D.chars.forEach((c, i) => { if (c && DEFAULT_NAMES.includes(c.name)) c.name = t('defName' + i); });
   let charCount = D.common.hasChar1 && D.chars[1] ? 2 : 1;
   let skipSave = false;
   const save = () => { if (!skipSave) saveD(D); };
@@ -941,11 +1241,11 @@ function createEngine() {
       for (const [trigger, value] of Object.entries(result))
         for (const line of (Array.isArray(value) ? value : [value]))
           if (typeof line === 'string' && line.trim()) { poolPush(ci, trigger, line.trim()); saved++; }
-      pushLog({ ci, trigger: '[전체]', time: Date.now(), line: `[트리거 ${saved}개 저장됨]`, fail: null });
+      pushLog({ ci, trigger: t('logAll'), time: Date.now(), line: t('logSaved', { n: saved }), fail: null });
     } catch (err) {
-      const msg = err.message || '오류';
+      const msg = err.message || 'error';
       if (msg.includes('429') || msg.includes('503')) blockedUntil = Date.now() + 120000;
-      pushLog({ ci, trigger: '[전체]', time: Date.now(), line: null, fail: `배치: ${msg}` });
+      pushLog({ ci, trigger: t('logAll'), time: Date.now(), line: null, fail: t('logBatch', { msg }) });
     } finally { batchRunning = false; }
   }
   function checkAndRefill(ci, trigger) {
@@ -969,9 +1269,9 @@ function createEngine() {
       D.common.achievements.push(id);
       const a = ACHIEVEMENTS.find(x => x.id === id);
       if (a) {
-        banner(`🏆 업적 달성!<br>${a.emoji} ${esc(a.name)}`, 3000);
+        banner(t('achvBanner', { emoji: a.emoji, name: esc(a.name) }), 3000);
         emit('confetti');
-        if (D.common.notifyOn) notify('🏆 업적 달성!', `${a.emoji} ${a.name} — ${a.desc}`);
+        if (D.common.notifyOn) notify(t('achvNotifyTitle'), `${a.emoji} ${a.name} — ${a.desc}`);
       }
       save();
     }
@@ -986,7 +1286,7 @@ function createEngine() {
     if (st.id === C.stageId) return;
     C.stageId = st.id;
     emit('grow', ci);
-    banner(`${st.emoji} ${esc(C.name)}${josa(C.name, '이', '가')} ${st.label}${josa(st.label, '으로', '로')} 성장했어요!`, 3500);
+    banner(t('grew', { emoji: st.emoji, name: esc(C.name), stage: st.label }), 3500);
     emit('confetti');
     aiSpeak(ci, 'idle');
     const m = { child: 'grow_child', teen: 'grow_teen', adult: 'grow_adult' };
@@ -1010,9 +1310,9 @@ function createEngine() {
   const specialCdUntil = Object.assign({ gift: 0, kiss: 0, date: 0 }, jget(CD_KEY, {}));
   const saveCd = () => jset(CD_KEY, specialCdUntil);
   const DATE_THEMES = [
-    { sky: 'linear-gradient(180deg,#42a5f5 0%,#90caf9 55%,#e3f2fd 100%)', ground: 'linear-gradient(180deg,#a5d6a7 0%,#66bb6a 100%)', name: '봄 소풍 🌸' },
-    { sky: 'linear-gradient(180deg,#7e57c2 0%,#ef6c00 45%,#ffb74d 100%)', ground: 'linear-gradient(180deg,#bf8040 0%,#8d5524 100%)', name: '노을 데이트 🌇' },
-    { sky: 'linear-gradient(180deg,#0d0d1a 0%,#0d1b3e 60%,#1a237e 100%)', ground: 'linear-gradient(180deg,#e8eaf6 0%,#c5cae9 100%)', name: '별 보러 가기 🌙' },
+    { sky: 'linear-gradient(180deg,#42a5f5 0%,#90caf9 55%,#e3f2fd 100%)', ground: 'linear-gradient(180deg,#a5d6a7 0%,#66bb6a 100%)', name: tl('dateNames')[0] },
+    { sky: 'linear-gradient(180deg,#7e57c2 0%,#ef6c00 45%,#ffb74d 100%)', ground: 'linear-gradient(180deg,#bf8040 0%,#8d5524 100%)', name: tl('dateNames')[1] },
+    { sky: 'linear-gradient(180deg,#0d0d1a 0%,#0d1b3e 60%,#1a237e 100%)', ground: 'linear-gradient(180deg,#e8eaf6 0%,#c5cae9 100%)', name: tl('dateNames')[2] },
   ];
   let dateTimer = null;
   function specialState(key) {
@@ -1027,7 +1327,7 @@ function createEngine() {
   function special(key) {
     const st = specialState(key);
     if (st.locked || st.cooldownMin) return;
-    if (dateTimer) return say(0, '이미 데이트 중이에요 🌸');
+    if (dateTimer) return say(0, pickOne(LINES.dating));
     const [n0, n1] = [D.chars[0].name, D.chars[1].name];
     if (key === 'gift') {
       specialCdUntil.gift = Date.now() + 30 * 60 * 1000; saveCd();
@@ -1046,7 +1346,7 @@ function createEngine() {
       addAff(80);
       const theme = pickOne(DATE_THEMES);
       emit('date', theme);
-      banner(`🌸 ${theme.name} 중...`, 10000);
+      banner(t('dateBanner', { name: theme.name }), 10000);
       emit('closer', 'date', 10000);
       [0, 1, 0, 1].forEach(i => emit('heart', i));
       aiSpeak(0, 'date'); setTimeout(() => aiSpeak(1, 'date'), 2400);
@@ -1068,10 +1368,10 @@ function createEngine() {
     const C = D.chars[ci]; if (!C || dateTimer) return;
     if (!C.actionCounts) C.actionCounts = { feed: 0, play: 0, clean: 0, medicine: 0, pet: 0 };
     if (!C.care) C.care = 0;
-    if (C.asleep && a !== 'sleep') return say(ci, '지금 자고 있어요... 💤');
+    if (C.asleep && a !== 'sleep') return say(ci, pickOne(LINES.asleep));
     const two = charCount === 2;
     if (a === 'feed') {
-      if (C.hunger >= 98) return say(ci, '배불러요! 🍎');
+      if (C.hunger >= 98) return say(ci, pickOne(LINES.full));
       C.hunger = Math.min(100, C.hunger + 25); C.happy = Math.min(100, C.happy + 3);
       C.care += 3; C.actionCounts.feed++;
       emit('heart', ci); emit('bounce', ci); emit('anim', ci, 'eat'); aiSpeak(ci, 'feed');
@@ -1079,7 +1379,7 @@ function createEngine() {
       if (C.actionCounts.feed === 1) unlock('first_feed');
       if (C.actionCounts.feed >= 50) unlock('feed_50');
     } else if (a === 'play') {
-      if (C.sleep >= 78) return say(ci, '졸려서 못 놀아요 😴');
+      if (C.sleep >= 78) return say(ci, pickOne(LINES.tooSleepy));
       C.happy = Math.min(100, C.happy + 20); C.hunger = Math.max(0, C.hunger - 6); C.sleep = Math.min(100, C.sleep + 8);
       C.care += 4; C.actionCounts.play++;
       emit('heart', ci); emit('heart', ci); emit('bounce', ci); emit('anim', ci, 'play'); aiSpeak(ci, 'play');
@@ -1088,7 +1388,7 @@ function createEngine() {
       if (C.actionCounts.play >= 30) unlock('play_30');
     } else if (a === 'sleep') {
       C.asleep = !C.asleep;
-      if (C.asleep) say(ci, 'Zzz... 💤');
+      if (C.asleep) say(ci, pickOne(LINES.sleepStart));
       else { emit('bounce', ci); aiSpeak(ci, 'wakeup'); }
     } else if (a === 'clean') {
       C.clean = Math.min(100, C.clean + 35); C.happy = Math.min(100, C.happy + 5);
@@ -1098,7 +1398,7 @@ function createEngine() {
       if (C.actionCounts.clean === 1) unlock('first_clean');
       if (C.clean >= 100) unlock('clean_100');
     } else if (a === 'medicine') {
-      if (C.health >= 85) return say(ci, '지금은 건강해요! 😊');
+      if (C.health >= 85) return say(ci, pickOne(LINES.healthy));
       C.health = Math.min(100, C.health + 30); C.actionCounts.medicine++;
       emit('anim', ci, 'med'); aiSpeak(ci, 'medicine');
       if (C.actionCounts.medicine >= 10) unlock('medicine_10');
@@ -1138,8 +1438,8 @@ function createEngine() {
 
       if      (C.hunger < 20 && !C.asleep) aiSpeak(ci, 'hungry');
       else if (C.sleep > 88 && !C.asleep)  aiSpeak(ci, 'sleepy');
-      else if (C.happy < 20 && !C.asleep)  say(ci, '심심해요 😢');
-      else if (C.clean < 20 && !C.asleep)  say(ci, '씻고 싶어요... 🛁');
+      else if (C.happy < 20 && !C.asleep)  say(ci, pickOne(LINES.bored));
+      else if (C.clean < 20 && !C.asleep)  say(ci, pickOne(LINES.dirty));
       else if (C.health < 25)              aiSpeak(ci, 'sick');
 
       C.age = calcAge(ci);
@@ -1206,7 +1506,7 @@ function createEngine() {
       if (t >= 3 && Math.random() < .5) {
         const w = C0.asleep ? 1 : 0;
         cool(30000); duo('guard', w, 1 - w);
-        say(w, pickOne(['쉿... 자고 있어 🤫', '푹 자~ 💤', '깨우면 안 되지...']));
+        say(w, pickOne(LINES.guard));
       }
       return;
     }
@@ -1217,8 +1517,8 @@ function createEngine() {
     if (aff <= 200) {
       cool(25000);
       if (Math.random() < .4) duo('flinch', a, b);
-      say(0, pickOne(['...', '으...어색해', '흠...']));
-      setTimeout(() => say(1, pickOne(['...', '뭐야...', '어색하다'])), 1200);
+      say(0, pickOne(LINES.awk0));
+      setTimeout(() => say(1, pickOne(LINES.awk1)), 1200);
     } else if (aff <= 400) {
       cool(25000); duo('peek', a, b);
     } else if (aff <= 600) {
@@ -1252,29 +1552,29 @@ function createEngine() {
     if (how === 'bump') {
       if (T.asleep && t >= 3) {                           // 친하면 뒤척이고 계속 잠
         duo('nuzzle-sleep', actor, target);
-        say(target, pickOne(['음냐... 💤', '으음... 조금만 더...', '...쿨쿨']));
+        say(target, pickOne(LINES.nuzzleSleep));
         addAff(.5);
       } else if (T.asleep) {                              // 안 친하면 깨서 투덜
         T.asleep = false; T.happy = Math.max(0, T.happy - 3);
         duo('bump', actor, target);
-        say(target, pickOne(['으악! 왜 깨워 💢', '깜짝이야...!', '자고 있었잖아 😠']));
+        say(target, pickOne(LINES.wokenAngry));
         addAff(-1);
       } else {
         duo('bump', actor, target);
-        if (t <= 1) { say(target, pickOne(['아야! 💢', '뭐야...!', '조심해!'])); addAff(-1); }
-        else { say(target, pickOne(['히히 부딪혔다 😆', '앗 깜짝이야~', '장난치지 마~ 😝'])); addAff(.5); }
+        if (t <= 1) { say(target, pickOne(LINES.bumpAngry)); addAff(-1); }
+        else { say(target, pickOne(LINES.bumpFun)); addAff(.5); }
       }
       save(); emit('change'); return true;
     }
     if (T.asleep) {
-      if (t >= 3) { duo('guard', actor, target); say(actor, pickOne(['쉿... 자고 있어 🤫', '푹 자~ 💤'])); }
-      else say(actor, pickOne(['...자네', '흠, 자고 있잖아']));
+      if (t >= 3) { duo('guard', actor, target); say(actor, pickOne(LINES.guard)); }
+      else say(actor, pickOne(LINES.sleepingOther));
       return true;
     }
     const kind = pickOne([['flinch'], ['peek'], ['highfive', 'chase'], ['hug', 'highfive', 'chase'], ['dance', 'hug', 'chase']][t]);
     duo(kind, actor, target);
-    if (t === 0) say(target, pickOne(['...', '으...어색해', '저리 가...']));
-    else if (t === 1) { say(actor, pickOne(['...안녕?', '어, 왔어?', '뭐 해?'])); addAff(.5); }
+    if (t === 0) say(target, pickOne(LINES.meetAwk));
+    else if (t === 1) { say(actor, pickOne(LINES.meetShy)); addAff(.5); }
     else { aiSpeak(actor, 'interact'); setTimeout(() => aiSpeak(target, 'interact'), 1400); addAff(t >= 3 ? 1.5 : 1); }
     if (kind === 'dance') setTimeout(() => emit('confetti'), 2600);
     save(); emit('change'); return true;
@@ -1296,21 +1596,23 @@ function createEngine() {
     if (diaryRetryAt[ci] > 0 && Date.now() < diaryRetryAt[ci]) return;
     diaryWriting[ci] = true;
     const ac = C.actionCounts || {};
-    const summary = `밥 ${ac.feed || 0}회, 놀기 ${ac.play || 0}회, 목욕 ${ac.clean || 0}회, 쓰다듬기 ${ac.pet || 0}회`;
-    const moodStr = C.happy > 70 ? '행복한' : C.hunger < 30 ? '배고팠던' : C.health < 50 ? '몸이 안 좋았던' : '평온한';
+    const summary = LANG === 'en'
+      ? `fed ${ac.feed || 0}x, played ${ac.play || 0}x, bathed ${ac.clean || 0}x, petted ${ac.pet || 0}x`
+      : `밥 ${ac.feed || 0}회, 놀기 ${ac.play || 0}회, 목욕 ${ac.clean || 0}회, 쓰다듬기 ${ac.pet || 0}회`;
+    const moodStr = t(C.happy > 70 ? 'mood.happy' : C.hunger < 30 ? 'mood.hungry' : C.health < 50 ? 'mood.sick' : 'mood.calm');
     let text = '';
     if (D.common.apiKey) {
       try {
         text = await geminiDiary({ apiKey: D.common.apiKey, me: C, other: charCount === 2 ? D.chars[1 - ci] : null, day: today, summary, mood: moodStr }) || '';
-        pushLog({ ci, trigger: '[일기]', time: Date.now(), line: text || '(생성 실패)', fail: text ? null : '응답 없음' });
+        pushLog({ ci, trigger: t('logDiary'), time: Date.now(), line: text || t('logDiaryFail'), fail: text ? null : t('logNoResp') });
         diaryRetryAt[ci] = -1;
       } catch (e) {
         const msg = e.message || '';
-        pushLog({ ci, trigger: '[일기]', time: Date.now(), line: null, fail: msg });
+        pushLog({ ci, trigger: t('logDiary'), time: Date.now(), line: null, fail: msg });
         if (msg.includes('503') || msg.includes('429')) { diaryRetryAt[ci] = Date.now() + 3 * 60 * 1000; diaryWriting[ci] = false; return; }
       }
     }
-    if (!text) text = `오늘은 ${moodStr} 하루였어요. ${ac.feed > 0 ? `밥을 ${ac.feed}번 먹었어요 🍎 ` : ''}${ac.play > 0 ? `${ac.play}번이나 같이 놀았어요 🎾 ` : ''}내일도 좋은 하루가 되길 바라요 😊`;
+    if (!text) text = t('diaryFallback', { mood: moodStr, feed: ac.feed || 0, play: ac.play || 0 });
     D.common.lastDiaryDay[ci] = today;
     const diary = loadDiary();
     diary.push({ ci, day: today, date: new Date().toLocaleDateString('ko-KR'), text });
@@ -1321,7 +1623,7 @@ function createEngine() {
   setInterval(() => { for (let ci = 0; ci < charCount; ci++) tryGenerateDiary(ci); }, 60000);
 
   // ---------- 알림 (원본 checkAndNotify) ----------
-  const STAT_LABELS = { hunger: '🍎 밥', happy: '😊 기분', energy: '⚡ 체력', clean: '🛁 청결', health: '❤️ 건강' };
+  const STAT_LABELS = Object.fromEntries(STAT_VIEW.map(k => [k, t('statE.' + k)]));
   const lastNotifyTime = {};
   function checkAndNotify() {
     const nc = D.common;
@@ -1336,7 +1638,7 @@ function createEngine() {
       const low = Object.entries(stats).filter(([k, on]) => on && statValue(C, k) < th).map(([k]) => STAT_LABELS[k]);
       if (!low.length) continue;
       lastNotifyTime[ci] = now;
-      notify('🐾 데스크펫', `${C.name}${josa(C.name, '이', '가')} 돌봄이 필요해요! (${low.join(', ')})`);
+      notify('🐾 ' + t('appName'), t('needCare', { name: C.name, stats: low.join(', ') }));
     }
   }
   setInterval(checkAndNotify, 60000);
@@ -1363,12 +1665,15 @@ function createEngine() {
       if (!D.chars[ci]) D.chars[ci] = defChar(ci);
       if (v.persona !== undefined && v.persona !== D.chars[ci].persona) poolClear(ci);
       Object.assign(D.chars[ci], v);
-      if (ci === 0 && D.chars[0].name !== '캐릭터1') unlock('first_name');
+      if (ci === 0 && !DEFAULT_NAMES.includes(D.chars[0].name)) unlock('first_name');
     }
     if (p.addChar) enableChar1();
     save(); emit('change');
   }
   setInterval(() => {
+    // 설정에서 언어를 바꾸면 저장하고 새로고침
+    const lg = localStorage.getItem(LANG_KEY);
+    if (lg && lg !== LANG) { save(); skipSave = true; location.reload(); return; }
     // 백업 가져오기 / 초기화: 저장 데이터를 통째로 바꾸고 새로고침
     const imp = localStorage.getItem(IMPORT_KEY);
     if (imp) {
@@ -1397,7 +1702,7 @@ function createEngine() {
       if (getPoolTotal(0) < 325) refillPool(0, true);
       if (charCount >= 2) setTimeout(() => { if (getPoolTotal(1) < 325) refillPool(1, true); }, 4000);
     }, 500);
-    if (D.chars[0]?.name && D.chars[0].name !== '캐릭터1') unlock('first_name');
+    if (D.chars[0]?.name && !DEFAULT_NAMES.includes(D.chars[0].name)) unlock('first_name');
     const h = new Date().getHours();
     if (h >= 0 && h < 4) unlock('night_owl');
   }, 1000);
@@ -1410,15 +1715,15 @@ function createEngine() {
     stage: ci => stageById(D.chars[ci]?.stageId),
     image: ci => { const s = localStorage.getItem(IMG_KEYS[ci]); return s && s.length > 100 ? s : null; },
     saveImage(ci, dataUrl) {
-      try { localStorage.setItem(IMG_KEYS[ci], dataUrl); } catch { alert('이미지가 너무 커서 저장하지 못했어요. 더 작은 이미지를 써주세요.'); return; }
-      unlock('first_image'); emit('images'); say(ci, '안녕! 잘 부탁해요 🎉');
+      try { localStorage.setItem(IMG_KEYS[ci], dataUrl); } catch { alert(t('imgTooBig')); return; }
+      unlock('first_image'); emit('images'); say(ci, pickOne(LINES.newImage));
     },
     mood(ci) {
       const C = D.chars[ci]; if (!C) return '😊';
       return C.asleep ? '😴' : C.health < 30 ? '🤒' : C.hunger < 20 ? '😫' : C.happy < 20 ? '😢' : C.clean < 20 ? '🤢' : C.happy > 80 && C.hunger > 70 ? '😻' : '😊';
     },
     setHostHidden(v) { hostHidden = v; if (v) checkAndNotify(); },
-    toggleSpeed() { speed = speed === 1 ? 20 : 1; say(0, speed > 1 ? '[테스트] 시간 20배속 ⏩' : '[테스트] 정상 속도'); },
+    toggleSpeed() { speed = speed === 1 ? 20 : 1; say(0, t(speed > 1 ? 'speedOn' : 'speedOff')); },
   };
 }
 /* ============================================================================
@@ -1674,6 +1979,16 @@ function initWindowView(E) {
   const size = ci => Math.round(BASE * E.stage(ci).scale);
   let sel = 0;
 
+  // 레이아웃은 360x300 기준. 실제 보이는 영역(뷰포트)이 이와 다르면 통째로 확대·축소해서 맞춤.
+  // 모니터 배율이 다른 환경(DPI 불일치, 텍스트 크기 설정 등)에서 창 밖으로 잘리는 걸 막는 안전장치.
+  let fit = 1;
+  function fitWindow() {
+    fit = Math.min(innerWidth / 360, innerHeight / 300) || 1;
+    $('#win').style.transform = Math.abs(fit - 1) < 0.005 ? '' : `scale(${fit})`;
+  }
+  fitWindow();
+  addEventListener('resize', fitWindow);
+
   const P = [0, 1].map(ci => {
     const s = PetSprite(E, ci);
     room.appendChild(s.el);
@@ -1805,7 +2120,7 @@ function initWindowView(E) {
       td.classList.toggle('bad', statBad(v));
     }
     const st = E.stage(sel);
-    $('#st-age').textContent = `${st.emoji} ${st.label} · ${C.age || 0}일 ${E.mood(sel)}`;
+    $('#st-age').textContent = `${st.emoji} ${st.label} · ${t('ageDays', { n: C.age || 0 })} ${E.mood(sel)}`;
     const aff = $('#st-aff');
     aff.style.display = two ? '' : 'none';
     if (two) aff.textContent = `${getAffinityLabel(D.common.affinity)[1]} ${Math.round(D.common.affinity)}`;
@@ -1823,7 +2138,7 @@ function initWindowView(E) {
     document.querySelectorAll('#toolbar [data-act]').forEach(b => b.disabled = dating);
     const sb = $('#toolbar [data-act=sleep]');
     sb.textContent = C.asleep ? '☀️' : '🌙';
-    sb.title = C.asleep ? '깨우기' : '재우기';
+    sb.title = t(C.asleep ? 'wake' : 'sleep');
     $('#sp-btn').style.display = E.count() === 2 ? '' : 'none';
     $('#sp-btn').disabled = dating;
     if ($('#sp-pop').classList.contains('show')) renderSpecial();
@@ -1833,7 +2148,7 @@ function initWindowView(E) {
       const b = $('#sp-' + key), st = E.specialState(key);
       b.classList.toggle('locked', !!st.locked);
       b.classList.toggle('cooldown', !!st.cooldownMin);
-      b.querySelector('small').textContent = st.locked ? `💕${st.need}` : st.cooldownMin ? `${st.cooldownMin}분 후` : '';
+      b.querySelector('small').textContent = st.locked ? `💕${st.need}` : st.cooldownMin ? t('minLater', { n: st.cooldownMin }) : '';
     }
   }
   setInterval(renderToolbar, 30000);
@@ -1962,13 +2277,14 @@ function initWindowView(E) {
   const fileIn = $('#img-file');
   let uploadCi = 0;
   P.forEach(p => {
-    p.el.title = '클릭: 반응 · 우클릭: 이미지 넣기';
+    p.el.title = t('petTip');
     // 누르고 5px 넘게 움직이면 들기, 아니면 클릭
     let down = null;
     p.el.addEventListener('pointerdown', e => {
       if (e.button !== 0) return;
       const r = room.getBoundingClientRect();
-      down = { x: e.clientX, y: e.clientY, ox: e.clientX - r.left - p.x, oy: e.clientY - r.top - p.fy };
+      // 화면 좌표 → 방 안 좌표 (fitWindow 배율을 되돌림)
+      down = { x: e.clientX, y: e.clientY, ox: (e.clientX - r.left) / fit - p.x, oy: (e.clientY - r.top) / fit - p.fy };
       p.el.setPointerCapture(e.pointerId);
     });
     p.el.addEventListener('pointermove', e => {
@@ -1979,8 +2295,8 @@ function initWindowView(E) {
       }
       if (p.dragging) {
         const r = room.getBoundingClientRect(), w = size(p.ci);
-        p.x = clampN(e.clientX - r.left - down.ox, 0, RW - w);
-        p.fy = clampN(e.clientY - r.top - down.oy, w + 2, FOOT_MAX);
+        p.x = clampN((e.clientX - r.left) / fit - down.ox, 0, RW - w);
+        p.fy = clampN((e.clientY - r.top) / fit - down.oy, w + 2, FOOT_MAX);
       }
     });
     p.el.addEventListener('pointerup', () => {
@@ -2006,8 +2322,8 @@ function initWindowView(E) {
   $('#sp-pop').addEventListener('click', e => {
     const b = e.target.closest('[data-sp]'); if (!b) return;
     const st = E.specialState(b.dataset.sp);
-    if (st.locked) return sys(`호감도 ${st.need} 이상이 되면 할 수 있어요`);
-    if (st.cooldownMin) return sys(`${st.cooldownMin}분 뒤에 다시 할 수 있어요`);
+    if (st.locked) return sys(t('needAff', { n: st.need }));
+    if (st.cooldownMin) return sys(t('cooldown', { n: st.cooldownMin }));
     $('#sp-pop').classList.remove('show');
     E.special(b.dataset.sp);
   });
@@ -2041,15 +2357,16 @@ function initWindowView(E) {
     $('#sp-pop').classList.remove('show');
     post({ type: 'capture', action, name: shotName(), vw: innerWidth, x: 0, y: 0, w: innerWidth, h: innerHeight });
   }
-  onHost('captured', m => sys(m.ok ? m.msg : '캡처 실패: ' + m.msg));
+  // 앱이 보낸 code로 문구를 고름 (예전 앱이 보낸 msg도 그대로 표시)
+  onHost('captured', m => sys(m.ok ? (m.code ? t(m.code) : m.msg) : t('capFail', { msg: m.msg })));
   const h2c = () => html2canvas($('#win'), { backgroundColor: '#cfc6b4', scale: Math.max(2, devicePixelRatio || 1), logging: false });
   $('#btn-shot').onclick = async () => {
     if (bridge) return nativeCapture('save');
     try {
       const c = await h2c(), a = document.createElement('a');
       a.download = shotName(); a.href = c.toDataURL('image/png'); a.click();
-      sys('📷 스크린샷을 저장했어요 (다운로드 폴더)');
-    } catch (e) { sys('스크린샷 실패: ' + e.message); }
+      sys(t('capSaved'));
+    } catch (e) { sys(t('shotFail', { msg: e.message })); }
   };
   $('#btn-copy').onclick = async () => {
     if (bridge) return nativeCapture('copy');
@@ -2057,14 +2374,14 @@ function initWindowView(E) {
       const c = await h2c();
       const blob = await new Promise(r => c.toBlob(r, 'image/png'));
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-      sys('📋 클립보드에 복사했어요');
-    } catch (e) { sys('복사 실패: ' + e.message); }
+      sys(t('capCopied'));
+    } catch (e) { sys(t('copyFail', { msg: e.message })); }
   };
 
   onHost('hostHidden', m => E.setHostHidden(!!m.on));
   post({ type: 'scale', value: D.common.scale || 1 });
   render();
-  if (!E.image(0)) setTimeout(() => sys('💡 펫을 우클릭하면 캐릭터 이미지를 넣을 수 있어요'), 2600);
+  if (!E.image(0)) setTimeout(() => sys(t('imgHint')), 2600);
 }
 /* ============================================================================
    자유 모드 뷰 (작업표시줄 위를 돌아다니는 투명 오버레이)
@@ -2171,13 +2488,13 @@ function initFreeView(E) {
     const ci = menuCi, C = D.chars[ci]; if (!C) return;
     const st = E.stage(ci);
     $('#m-name').textContent = C.name;
-    $('#m-sub').textContent = `${st.emoji} ${st.label} · ${C.age || 0}일 ${E.mood(ci)}`;
+    $('#m-sub').textContent = `${st.emoji} ${st.label} · ${t('ageDays', { n: C.age || 0 })} ${E.mood(ci)}`;
     for (const k of STAT_VIEW) {
       const v = Math.round(statValue(C, k)), i = $('#m-' + k);
       i.style.width = v + '%';
       i.classList.toggle('bad', statBad(v));
     }
-    menu.querySelector('[data-act=sleep]').textContent = C.asleep ? '☀️ 깨우기' : '💤 재우기';
+    menu.querySelector('[data-act=sleep]').textContent = t(C.asleep ? 'wakeE' : 'sleepE');
     const two = E.count() === 2;
     $('#m-special').style.display = two ? '' : 'none';
     $('#m-aff').style.display = two ? '' : 'none';
@@ -2186,7 +2503,7 @@ function initFreeView(E) {
       for (const key of ['gift', 'kiss', 'date']) {
         const b = menu.querySelector('[data-sp=' + key + ']'), s = E.specialState(key);
         b.classList.toggle('locked', !!s.locked); b.classList.toggle('cooldown', !!s.cooldownMin);
-        b.querySelector('small').textContent = s.locked ? `💕${s.need}` : s.cooldownMin ? `${s.cooldownMin}분` : '';
+        b.querySelector('small').textContent = s.locked ? `💕${s.need}` : s.cooldownMin ? t('minShort', { n: s.cooldownMin }) : '';
       }
     }
     menu.querySelectorAll('button[data-act], button[data-sp]').forEach(b => b.disabled = E.isDating());
@@ -2205,7 +2522,7 @@ function initFreeView(E) {
     if (a && !a.disabled) E.act(menuCi, a.dataset.act);
     if (s && !s.disabled) {
       const st = E.specialState(s.dataset.sp);
-      if (st.locked) return bubble(menuCi, `호감도 ${st.need} 이상이면 할 수 있어요`);
+      if (st.locked) return bubble(menuCi, t('needAff', { n: st.need }));
       if (!st.cooldownMin) { closeMenu(); E.special(s.dataset.sp); }
     }
   });
@@ -2341,7 +2658,7 @@ function initFreeView(E) {
         const r = el.getBoundingClientRect();
         rects.push({ x: r.left - pad, y: r.top - pad, w: r.width + pad * 2, h: r.height + pad * 2 });
       }
-      post({ type: 'hitRects', rects });
+      post({ type: 'hitRects', rects, vw: innerWidth });   // vw: 앱이 CSS px ↔ 창 좌표 배율을 계산하는 데 씀
     }
     requestAnimationFrame(frame);
   }
@@ -2397,9 +2714,9 @@ function initSettingsView() {
   // ---- 일기 / 업적 / 로그 ----
   function renderDiary() {
     const list = $('#diary-list'), entries = loadDiary().slice().reverse();
-    if (!entries.length) { list.innerHTML = '<div class="log-empty">아직 일기가 없어요 📔</div>'; return; }
+    if (!entries.length) { list.innerHTML = `<div class="log-empty">${t('diary.empty')}</div>`; return; }
     list.innerHTML = entries.map(e => `<div class="diary-item">
-        <div class="diary-date">📔 ${esc(D.chars[e.ci]?.name || `캐릭터${e.ci + 1}`)} · ${e.day}일째 · ${esc(e.date)}</div>
+        <div class="diary-date">${esc(t('diaryDate', { name: D.chars[e.ci]?.name || t('defName' + e.ci), day: e.day, date: e.date }))}</div>
         <div class="diary-body">${esc(e.text)}</div></div>`).join('');
   }
   function renderAchv() {
@@ -2423,13 +2740,13 @@ function initSettingsView() {
     else if (filter === '1') items = items.filter(e => e.ci === 1);
     else if (filter === 'fail') items = items.filter(e => e.fail);
     const list = $('#log-list');
-    if (!items.length) { list.innerHTML = '<div class="log-empty">아직 대사가 없어요</div>'; return; }
+    if (!items.length) { list.innerHTML = `<div class="log-empty">${t('log.empty')}</div>`; return; }
     list.innerHTML = items.map(e => {
       const t = new Date(e.time);
       const time = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
-      const line = e.fail ? `<div class="log-line log-fail">❌ ${esc(e.fail)}</div>` : `<div class="log-line">${esc(e.line || '(없음)')}</div>`;
-      return `<div class="log-item"><div class="log-meta"><span class="log-who">${esc(D.chars[e.ci]?.name || `캐릭터${e.ci + 1}`)}</span><span class="log-time">${time}</span></div>
-        <div class="log-trigger">상황: ${esc(TRIGGER_LABELS[e.trigger] || e.trigger)}</div>${line}</div>`;
+      const line = e.fail ? `<div class="log-line log-fail">❌ ${esc(e.fail)}</div>` : `<div class="log-line">${esc(e.line || t('logNone'))}</div>`;
+      return `<div class="log-item"><div class="log-meta"><span class="log-who">${esc(D.chars[e.ci]?.name || t('defName' + e.ci))}</span><span class="log-time">${time}</span></div>
+        <div class="log-trigger">${esc(t('logTrigger', { t: TRIGGER_LABELS[e.trigger] || e.trigger }))}</div>${line}</div>`;
     }).join('');
   }
 
@@ -2437,13 +2754,13 @@ function initSettingsView() {
   [0, 1].forEach(i => {
     const prev = $('#setprev' + i), lbl = $('#imglbl' + i);
     const src = localStorage.getItem(IMG_KEYS[i]);
-    if (src && src.length > 100) { prev.src = src; prev.style.display = 'block'; lbl.textContent = '✅ 이미지 있음 (클릭해서 변경)'; }
+    if (src && src.length > 100) { prev.src = src; prev.style.display = 'block'; lbl.textContent = t('imgHas'); }
     $('#imgbox' + i).addEventListener('click', () => $('#setfile' + i).click());
     $('#setfile' + i).addEventListener('change', e => {
       const f = e.target.files[0]; if (!f) return;
       readImageFile(f, url => {
-        try { localStorage.setItem(IMG_KEYS[i], url); } catch { alert('이미지가 너무 커요. 더 작은 이미지를 써주세요.'); return; }
-        prev.src = url; prev.style.display = 'block'; lbl.textContent = '✅ 이미지 있음 (클릭해서 변경)';
+        try { localStorage.setItem(IMG_KEYS[i], url); } catch { alert(t('imgTooBig')); return; }
+        prev.src = url; prev.style.display = 'block'; lbl.textContent = t('imgHas');
         localStorage.setItem(IMG_SIGNAL, Date.now().toString());
       });
     });
@@ -2451,14 +2768,14 @@ function initSettingsView() {
 
   const flash = id => {
     const btn = $('#' + id), orig = btn.textContent;
-    btn.classList.add('ok'); btn.textContent = '✅ 저장됐어요!';
+    btn.classList.add('ok'); btn.textContent = t('saved');
     setTimeout(() => { btn.classList.remove('ok'); btn.textContent = orig; }, 1600);
   };
 
   // ---- 알림 / 말풍선 ----
   const notifyOnEl = $('#set-notify-on'), threshEl = $('#set-notify-threshold'), intervalEl = $('#set-notify-interval'), bubDurEl = $('#set-bubble-dur');
   const nc = D.common;
-  const durLabel = v => v >= 10 ? '다음 대사까지' : `${v}초`;
+  const durLabel = v => v >= 10 ? t('untilNext') : t('sec', { n: v });
   bubDurEl.value = nc.bubbleDur ?? 3; $('#bubble-dur-val').textContent = durLabel(+bubDurEl.value);
   bubDurEl.addEventListener('input', () => $('#bubble-dur-val').textContent = durLabel(+bubDurEl.value));
   notifyOnEl.checked = !!nc.notifyOn;
@@ -2475,10 +2792,22 @@ function initSettingsView() {
     }
   });
 
-  if (IS_MAC) {
-    $('#notify-where').textContent = '(맥 알림으로 와요)';
-    $('#autostart-label').textContent = '맥에 로그인할 때 데스크펫도 같이 켜기';
-  }
+  $('#notify-where').textContent = t(IS_MAC ? 'notifyMac' : 'notifyWin');
+  $('#autostart-label').textContent = t(IS_MAC ? 'autoMac' : 'autoWin');
+
+  // ---- 언어 ----
+  document.querySelectorAll('.lang-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.lang === LANG);
+    b.addEventListener('click', () => {
+      const v = b.dataset.lang;
+      if (v === LANG) return;
+      // 확인 = 대사 풀도 비우고 바꾸기 / 취소 = 대사는 두고 바꾸기
+      if (confirm(I18N[v].langConfirm)) savePool({});
+      try { localStorage.setItem(LANG_KEY, v); } catch {}
+      post({ type: 'lang', value: v });
+      location.reload();   // 펫 창은 엔진이 언어 변경을 감지해서 새로고침
+    });
+  });
 
   // ---- 시작 프로그램 (앱에서만 — 윈도우는 레지스트리, 맥은 로그인 항목) ----
   if (bridge) {
@@ -2520,29 +2849,29 @@ function initSettingsView() {
     a.download = `deskpet-backup-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-    $('#data-msg').textContent = '✅ 내보냈어요 (다운로드 폴더)';
+    $('#data-msg').textContent = t('exported');
   };
   $('#btn-import').onclick = () => $('#import-file').click();
   $('#import-file').onchange = e => {
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
     f.text().then(txt => {
       let obj;
-      try { obj = JSON.parse(txt); } catch { return alert('백업 파일을 읽을 수 없어요.'); }
-      if (!obj || typeof obj !== 'object' || !obj[SAVE_KEY]) return alert('데스크펫 백업 파일이 아니에요.');
-      if (!confirm('지금 데이터를 백업 파일 내용으로 바꿀까요?\n현재 스탯·업적·일기·대사 풀·이미지가 모두 교체돼요.')) return;
-      requestReplace(obj, '✅ 가져왔어요!');
+      try { obj = JSON.parse(txt); } catch { return alert(t('importBad')); }
+      if (!obj || typeof obj !== 'object' || !obj[SAVE_KEY]) return alert(t('importNotDp'));
+      if (!confirm(t('importConfirm'))) return;
+      requestReplace(obj, t('imported'));
     });
   };
   $('#btn-reset').onclick = () => {
-    if (!confirm('⚠️ 정말 초기화할까요?\n스탯, 업적, 일기, 대사 풀이 모두 삭제돼요.\n이미지는 유지돼요.')) return;
+    if (!confirm(t('resetConfirm'))) return;
     const keep = {};
     IMG_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v) keep[k] = v; });
-    requestReplace(keep, '✅ 초기화했어요!');
+    requestReplace(keep, t('resetDone'));
   };
   // 실제 교체는 메인(펫) 쪽 엔진이 수행 — 메인이 저장하면서 덮어쓰는 걸 막기 위해
   function requestReplace(obj, doneMsg) {
     localStorage.setItem(IMPORT_KEY, JSON.stringify(obj));
-    $('#data-msg').textContent = '⏳ 적용 중...';
+    $('#data-msg').textContent = t('applying');
     const t0 = Date.now();
     const iv = setInterval(() => {
       if (!localStorage.getItem(IMPORT_KEY)) { clearInterval(iv); $('#data-msg').textContent = doneMsg; setTimeout(() => location.reload(), 800); }
@@ -2579,7 +2908,7 @@ function initPoolView() {
   function renderTriggers() {
     const p = loadPool()[ci] || {};
     const total = TRIGGERS.reduce((s, t) => s + (p[t]?.length || 0), 0);
-    $('#pl-total').textContent = `총 ${total}개 · 상황마다 최대 ${POOL_MAX}개`;
+    $('#pl-total').textContent = t('poolTotal', { n: total, max: POOL_MAX });
     $('#pl-trigs').innerHTML = TRIGGERS.map(t => {
       const n = p[t]?.length || 0;
       return `<button class="pl-trig${t === trig ? ' active' : ''}" data-t="${t}">
@@ -2591,15 +2920,15 @@ function initPoolView() {
     $('#pl-title').textContent = `${TRIGGER_LABELS[trig]} (${trig})`;
     const list = $('#pl-lines');
     if (!arr.length) {
-      list.innerHTML = `<div class="pl-empty">저장된 AI 대사가 없어서 아래 기본 대사가 나와요</div>` +
+      list.innerHTML = `<div class="pl-empty">${t('poolEmpty')}</div>` +
         (FALLBACKS[trig] || FALLBACKS.idle).map(l => `<div class="pl-row fallback"><span class="pl-text">${esc(l)}</span>
-          <button class="pl-ico" data-say="${esc(l)}" title="펫이 말해보기">▶</button></div>`).join('');
+          <button class="pl-ico" data-say="${esc(l)}" title="${t('poolSayTip')}">▶</button></div>`).join('');
       return;
     }
     list.innerHTML = arr.map((l, i) => `<div class="pl-row">
         <input class="pl-input" data-i="${i}" value="${esc(l)}" maxlength="60">
-        <button class="pl-ico" data-say-i="${i}" title="펫이 말해보기">▶</button>
-        <button class="pl-ico del" data-del="${i}" title="삭제">✕</button></div>`).join('');
+        <button class="pl-ico" data-say-i="${i}" title="${t('poolSayTip')}">▶</button>
+        <button class="pl-ico del" data-del="${i}" title="${t('poolDelTip')}">✕</button></div>`).join('');
   }
   const renderAll = () => { renderChars(); renderTriggers(); renderLines(); };
 
@@ -2612,16 +2941,16 @@ function initPoolView() {
     const inp = e.target.closest('.pl-input'); if (!inp) return;
     const arr = lines(), v = inp.value.trim(), i = +inp.dataset.i;
     if (!v) arr.splice(i, 1); else arr[i] = v;
-    setLines(arr); renderTriggers(); renderLines(); note('✏️ 고쳤어요');
+    setLines(arr); renderTriggers(); renderLines(); note(t('poolEdited'));
   });
   $('#pl-lines').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('pl-input')) e.target.blur(); });
   $('#pl-lines').addEventListener('click', e => {
     const del = e.target.closest('[data-del]'), sy = e.target.closest('[data-say], [data-say-i]');
-    if (del) { const arr = lines(); arr.splice(+del.dataset.del, 1); setLines(arr); renderTriggers(); renderLines(); note('🗑️ 지웠어요'); }
+    if (del) { const arr = lines(); arr.splice(+del.dataset.del, 1); setLines(arr); renderTriggers(); renderLines(); note(t('poolDeleted')); }
     if (sy) {
       const text = sy.dataset.say ?? lines()[+sy.dataset.sayI];
       jset(SAY_KEY, { ci, text, ts: Date.now() });
-      note('▶ 펫에게 말하게 했어요');
+      note(t('poolSaid'));
     }
   });
 
@@ -2629,9 +2958,9 @@ function initPoolView() {
   function addLine() {
     const inp = $('#pl-new'), v = inp.value.trim(); if (!v) return;
     const arr = lines();
-    if (arr.includes(v)) return note('이미 있는 대사예요');
+    if (arr.includes(v)) return note(t('poolDup'));
     arr.push(v); if (arr.length > POOL_MAX) arr.shift();
-    setLines(arr); inp.value = ''; renderTriggers(); renderLines(); note('➕ 추가했어요');
+    setLines(arr); inp.value = ''; renderTriggers(); renderLines(); note(t('poolAdded'));
     $('#pl-lines').scrollTop = 1e9;
   }
   $('#pl-add').onclick = addLine;
@@ -2639,21 +2968,21 @@ function initPoolView() {
 
   // ---- 비우기 ----
   $('#pl-clear-trig').onclick = () => {
-    if (!lines().length || !confirm(`"${TRIGGER_LABELS[trig]}" 대사를 모두 지울까요?\n(비어 있으면 기본 대사가 나와요)`)) return;
-    setLines([]); renderTriggers(); renderLines(); note('비웠어요');
+    if (!lines().length || !confirm(t('poolClearTrigQ', { t: TRIGGER_LABELS[trig] }))) return;
+    setLines([]); renderTriggers(); renderLines(); note(t('poolCleared'));
   };
   $('#pl-clear-all').onclick = () => {
     const name = chars()[ci]?.name;
-    if (!confirm(`${name}의 대사 풀을 전부 지울까요?\nAPI 키가 있으면 나중에 다시 자동으로 채워져요.`)) return;
-    poolClear(ci); renderAll(); note('전부 비웠어요');
+    if (!confirm(t('poolClearAllQ', { name }))) return;
+    poolClear(ci); renderAll(); note(t('poolClearedAll'));
   };
 
   // ---- AI로 채우기 (한 번 호출 = 상황마다 3개씩) ----
   $('#pl-ai').onclick = async () => {
     D = loadD();
-    if (!D.common?.apiKey) return note('⚠️ 설정 → 공통에서 Gemini API 키를 먼저 넣어주세요');
+    if (!D.common?.apiKey) return note(t('poolNeedKey'));
     if (busy) return;
-    busy = true; $('#pl-ai').disabled = true; note('🤖 만드는 중... (10~20초)');
+    busy = true; $('#pl-ai').disabled = true; note(t('poolMaking'));
     try {
       const two = D.common.hasChar1 && D.chars[1];
       const result = await geminiAllTriggers({
@@ -2664,10 +2993,10 @@ function initPoolView() {
       for (const [t, v] of Object.entries(result))
         for (const line of (Array.isArray(v) ? v : [v]))
           if (typeof line === 'string' && line.trim()) { poolPush(ci, t, line.trim()); saved++; }
-      const l = loadLog(); l.push({ ci, trigger: '[전체]', time: Date.now(), line: `[대사 풀 창에서 ${saved}개 생성]`, fail: null }); saveLog(l);
-      note(`✅ ${saved}개 추가했어요`);
+      const l = loadLog(); l.push({ ci, trigger: t('logAll'), time: Date.now(), line: t('logPoolGen', { n: saved }), fail: null }); saveLog(l);
+      note(t('poolMade', { n: saved }));
     } catch (e) {
-      note('❌ ' + (e.message || '실패'));
+      note('❌ ' + (e.message || t('poolFail')));
     } finally {
       busy = false; $('#pl-ai').disabled = false; renderAll();
     }
@@ -2676,6 +3005,8 @@ function initPoolView() {
   // 메인 쪽에서 자동 보충되면 반영 (편집 중일 땐 건드리지 않음)
   let lastSig = '';
   setInterval(() => {
+    const lg = localStorage.getItem(LANG_KEY);
+    if (lg && lg !== LANG) return location.reload();
     if (document.activeElement && document.activeElement.classList.contains('pl-input')) return;
     const sig = localStorage.getItem(POOL_KEY) || '';
     if (sig !== lastSig) { lastSig = sig; D = loadD(); renderAll(); }

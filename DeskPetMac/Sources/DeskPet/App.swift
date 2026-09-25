@@ -2,9 +2,15 @@ import AppKit
 
 @main
 enum DeskPetMain {
+    // ⚠ NSApp.delegate는 약한(weak) 참조라, 지역 변수에만 두면 릴리즈 빌드 최적화로 곧바로 해제됨
+    //   → applicationDidFinishLaunching이 안 불려서 "실행은 되는데 아무것도 안 뜨는" 상태가 됨.
+    //   static으로 붙잡아 둠.
+    static let delegate = AppDelegate()
+
     static func main() {
+        Log.start()
         let app = NSApplication.shared
-        let delegate = AppDelegate()
+        app.setActivationPolicy(.accessory)   // Dock 아이콘 없는 메뉴바 앱 (Info.plist LSUIElement와 같음)
         app.delegate = delegate
         app.run()
     }
@@ -16,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let autoItem = NSMenuItem()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Log.write("launched \(Bundle.main.bundlePath)")
         // 두 개 실행되면 같은 세이브를 서로 덮어쓰므로 하나만 허용
         if let id = Bundle.main.bundleIdentifier {
             let others = NSRunningApplication.runningApplications(withBundleIdentifier: id)
@@ -33,6 +40,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
+
+    // 이미 실행 중일 때 응용 프로그램 폴더에서 또 더블클릭하면 → 숨어 있던 펫 창을 다시 보여줌
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        Shell.shared.reveal()
+        return false
+    }
 
     // 종료 전에 페이지에 저장을 한 번 시키고 끝냄 (Cmd+Q, 메뉴 종료 모두)
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {

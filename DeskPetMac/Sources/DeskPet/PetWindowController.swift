@@ -48,7 +48,13 @@ final class PetWindowController: NSObject, HostWindow, NSWindowDelegate {
     }
 
     func show() {
+        // 모니터를 뺐거나 해상도가 바뀌어 창이 화면 밖에 있으면 오른쪽 아래로 되돌림
+        if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }),
+           let vf = NSScreen.main?.visibleFrame {
+            window.setFrameOrigin(NSPoint(x: vf.maxX - window.frame.width - 24, y: vf.minY + 24))
+        }
         window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()   // 메뉴바 앱이 아직 활성화 전이어도 무조건 앞에
         NSApp.activate(ignoringOtherApps: true)
         page.post(["type": "hostHidden", "on": false])
     }

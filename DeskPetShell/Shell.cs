@@ -17,6 +17,9 @@ static class Shell
     public static readonly string WebDataDir = Path.Combine(AppDir, "WebView2");   // localStorage 등 세이브 데이터
 
     public static CoreWebView2Environment Env = null!;
+
+    /// <summary>앱 껍데기 문구 (트레이 메뉴·안내창). 언어는 페이지가 알려준 값을 따름</summary>
+    public static string L(string ko, string en) => Settings.Lang == "en" ? en : ko;
     public static ShellSettings Settings = new();
     static Window? _current;
     static SettingsWindow? _settings;
@@ -70,7 +73,8 @@ static class Shell
     }
 
     static void ShowError(Exception ex) =>
-        MessageBox.Show("화면을 띄우는 중 오류가 났어요. 트레이 아이콘에서 다시 열어 주세요.\n\n" + ex.Message, "DeskPet");
+        MessageBox.Show(L("화면을 띄우는 중 오류가 났어요. 트레이 아이콘에서 다시 열어 주세요.",
+                          "Something went wrong while opening the window. Please reopen it from the tray icon.") + "\n\n" + ex.Message, "DeskPet");
 
     /// <summary>창이 닫히는 중이면 메시지 전송이 예외를 던지므로 조용히 무시</summary>
     public static void SafePost(CoreWebView2? core, string json)
@@ -166,6 +170,11 @@ static class Shell
             case "closeSettings":
                 d.InvokeAsync(CloseSettings);
                 return true;
+            case "lang":   // 페이지가 현재 언어를 알려줌 → 트레이 메뉴·창 제목 맞춤
+                var lang = msg.GetProperty("value").GetString() == "en" ? "en" : "ko";
+                if (lang != Settings.Lang) { Settings.Lang = lang; Settings.Save(); }
+                d.InvokeAsync(() => { Tray.ApplyLang(); _settings?.ApplyLang(); _pool?.ApplyLang(); });
+                return true;
             case "notify":
                 Tray.Balloon(msg.GetProperty("title").GetString() ?? "", msg.GetProperty("body").GetString() ?? "");
                 return true;
@@ -188,6 +197,9 @@ class ShellSettings
     public double? WinTop { get; set; }
     public bool Topmost { get; set; } = true;
     public double Scale { get; set; } = 1;
+    /// <summary>처음엔 윈도우 표시 언어로 추정, 이후엔 페이지(설정의 언어 선택)가 알려준 값</summary>
+    public string Lang { get; set; } =
+        System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ko" ? "ko" : "en";
 
     static string FilePath => Path.Combine(Shell.AppDir, "settings.json");
 

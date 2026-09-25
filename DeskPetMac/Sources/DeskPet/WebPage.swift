@@ -23,6 +23,14 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
         super.init()
 
         cfg.userContentController.add(WeakHandler(self), name: "deskpet")
+        // 페이지 JS 오류를 앱 로그로 (맥에서 문제 생겼을 때 원인 추적용)
+        cfg.userContentController.addUserScript(WKUserScript(source: """
+            (function(){
+              function send(m){ try{ window.webkit.messageHandlers.deskpet.postMessage({type:'log', msg:String(m)}); }catch(_){} }
+              window.addEventListener('error', function(e){ send((e.message||'error')+' @'+(e.filename||'')+':'+(e.lineno||0)); });
+              window.addEventListener('unhandledrejection', function(e){ send('rejection: '+(e.reason && (e.reason.stack||e.reason))); });
+            })();
+            """, injectionTime: .atDocumentStart, forMainFrameOnly: false))
         webView.uiDelegate = self
         webView.navigationDelegate = self
         if transparent {
@@ -30,7 +38,15 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
             webView.underPageBackgroundColor = .clear
         }
 
-        guard let web = Bundle.main.resourceURL?.appendingPathComponent("web") else { return }
+        guard let web = Bundle.main.resourceURL?.appendingPathComponent("web"),
+              FileManager.default.fileExists(atPath: web.appendingPathComponent("index.html").path) else {
+            Log.write("web/index.html missing in \(Bundle.main.bundlePath)")
+            DispatchQueue.main.async {
+                Shell.alert(Shell.L("앱 안의 화면 파일(web/index.html)을 찾을 수 없어요. 다시 내려받아 주세요.",
+                                    "The app's page files (web/index.html) are missing. Please download it again."))
+            }
+            return
+        }
         var comps = URLComponents(url: web.appendingPathComponent("index.html"), resolvingAgainstBaseURL: false)!
         comps.query = query
         webView.loadFileURL(comps.url!, allowingReadAccessTo: web)
@@ -55,7 +71,22 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        Log.write("page loaded: \(webView.url?.query ?? "")")
         if !loaded { loaded = true; onLoaded?() }
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        Log.write("page failed: \(error.localizedDescription)")
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        Log.write("page failed (provisional): \(error.localizedDescription)")
+    }
+
+    // 웹뷰 프로세스가 죽으면 빈 창이 되므로 다시 불러옴
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        Log.write("web content process terminated → reload")
+        webView.reload()
     }
 
     // MARK: alert / confirm / prompt — 웹뷰는 기본으로 안 띄워주므로 직접

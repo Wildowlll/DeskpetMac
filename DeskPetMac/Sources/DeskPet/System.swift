@@ -47,3 +47,37 @@ final class NotifierDelegate: NSObject, UNUserNotificationCenterDelegate {
         completionHandler([.banner, .sound])
     }
 }
+
+
+/// 간단한 파일 로그: ~/Library/Logs/DeskPet.log (콘솔 앱에서도 "DeskPet"으로 검색 가능)
+enum Log {
+    static let url: URL = {
+        let dir = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Logs")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("DeskPet.log")
+    }()
+
+    /// 실행할 때마다: 로그가 너무 커졌으면 비우고 시작
+    static func start() {
+        if let size = (try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? Int, size > 512_000 {
+            try? FileManager.default.removeItem(at: url)
+        }
+        let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        write("===== DeskPet \(v) / macOS \(ProcessInfo.processInfo.operatingSystemVersionString)")
+    }
+
+    static func write(_ text: String) {
+        NSLog("DeskPet: %@", text)
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        guard let data = "[\(f.string(from: Date()))] \(text)\n".data(using: .utf8) else { return }
+        if let h = try? FileHandle(forWritingTo: url) {
+            h.seekToEndOfFile()
+            h.write(data)
+            try? h.close()
+        } else {
+            try? data.write(to: url)
+        }
+    }
+}
