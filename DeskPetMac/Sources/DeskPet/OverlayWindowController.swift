@@ -9,7 +9,8 @@ final class OverlayWindowController: NSObject, HostWindow {
     let window: BorderlessWindow
     var onReady: (() -> Void)?
 
-    private var hitRects: [NSRect] = []   // 창 기준 좌상단 원점 좌표 (= CSS px)
+    private var hitRects: [NSRect] = []   // 창 기준 좌상단 원점 좌표 (pt)
+    private var k: CGFloat = 1            // CSS px → pt 배율 (페이지가 알려준 뷰포트 폭으로 계산)
     private var hitTimer: Timer?
     private let drag = NativeDrag()
     private var lastSent = NSPoint(x: -1, y: -1)
@@ -77,15 +78,19 @@ final class OverlayWindowController: NSObject, HostWindow {
         if Shell.shared.handleCommon(msg, from: page) { return }
         switch msg["type"] as? String {
         case "hitRects":
+            let vw = num(msg["vw"])
+            if vw > 0 { k = window.frame.width / CGFloat(vw) }
             let rects = msg["rects"] as? [[String: Any]] ?? []
-            hitRects = rects.map { NSRect(x: num($0["x"]), y: num($0["y"]), width: num($0["w"]), height: num($0["h"])) }
+            let kk = Double(k)
+            hitRects = rects.map { NSRect(x: num($0["x"]) * kk, y: num($0["y"]) * kk, width: num($0["w"]) * kk, height: num($0["h"]) * kk) }
 
         case "dragStart":   // 펫을 잡았을 때 → 좌표를 페이지로 계속 보냄
             window.ignoresMouseEvents = false
             lastSent = NSPoint(x: -1, y: -1)
             drag.start(onMove: { [weak self] p, _ in
                 guard let self = self else { return }
-                let l = self.toLocal(p)
+                let pt = self.toLocal(p)
+                let l = NSPoint(x: pt.x / self.k, y: pt.y / self.k)   // pt → CSS px
                 if l == self.lastSent { return }
                 self.lastSent = l
                 self.page.post(["type": "dragMove", "x": Double(l.x), "y": Double(l.y)])

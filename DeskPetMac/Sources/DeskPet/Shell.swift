@@ -15,6 +15,11 @@ final class Shell {
     static let shared = Shell()
     let settings = ShellSettings()
 
+    /// 앱 껍데기 문구 (메뉴바 메뉴·안내창). 언어는 페이지가 알려준 값을 따름
+    static func L(_ ko: String, _ en: String) -> String { shared.settings.lang == "en" ? en : ko }
+    /// 언어가 바뀌면 메뉴바 메뉴 등을 다시 그리기 위한 콜백 (AppDelegate가 등록)
+    var onLangChange: (() -> Void)?
+
     private(set) var current: HostWindow?
     private var pages: [String: PageWindowController] = [:]   // "settings", "pool"
 
@@ -73,11 +78,18 @@ final class Shell {
             DispatchQueue.main.async { self.openPage("pool") }
         case "closeSettings":
             DispatchQueue.main.async { self.pages["settings"]?.window.performClose(nil) }
+        case "lang":   // 페이지가 현재 언어를 알려줌
+            let v = (msg["value"] as? String) == "en" ? "en" : "ko"
+            settings.lang = v
+            DispatchQueue.main.async {
+                self.onLangChange?()
+                self.pages.values.forEach { $0.applyLang() }
+            }
         case "notify":
             Notifier.show(title: msg["title"] as? String ?? "", body: msg["body"] as? String ?? "")
         case "setAutostart":
             do { try Autostart.set(msg["on"] as? Bool ?? false) }
-            catch { Shell.alert("로그인 항목을 바꾸지 못했어요.\n\n\(error.localizedDescription)") }
+            catch { Shell.alert(Shell.L("로그인 항목을 바꾸지 못했어요.", "Couldn't change the login item.") + "\n\n\(error.localizedDescription)") }
             page.post(["type": "autostart", "on": Autostart.isOn])
         case "getAutostart":
             page.post(["type": "autostart", "on": Autostart.isOn])
@@ -98,14 +110,14 @@ final class Shell {
                           width: num(msg["w"]) * k, height: num(msg["h"]) * k)
         wv.takeSnapshot(with: cfg) { image, error in
             guard let image = image else {
-                page.post(["type": "captured", "ok": false, "msg": error?.localizedDescription ?? "캡처 실패"])
+                page.post(["type": "captured", "ok": false, "msg": error?.localizedDescription ?? "capture failed"])
                 return
             }
             if (msg["action"] as? String) == "save" {
                 guard let tiff = image.tiffRepresentation,
                       let rep = NSBitmapImageRep(data: tiff),
                       let png = rep.representation(using: .png, properties: [:]) else {
-                    page.post(["type": "captured", "ok": false, "msg": "이미지 변환 실패"])
+                    page.post(["type": "captured", "ok": false, "msg": "image conversion failed"])
                     return
                 }
                 let dir = FileManager.default.urls(for: .picturesDirectory, in: .userDomainMask)[0]
@@ -115,7 +127,7 @@ final class Shell {
                 do {
                     try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
                     try png.write(to: dir.appendingPathComponent(name))
-                    page.post(["type": "captured", "ok": true, "msg": "📷 사진/DeskPet 폴더에 저장했어요"])
+                    page.post(["type": "captured", "ok": true, "msg": "📷 Pictures/DeskPet", "code": "capSavedMac"])
                 } catch {
                     page.post(["type": "captured", "ok": false, "msg": error.localizedDescription])
                 }
@@ -123,14 +135,14 @@ final class Shell {
                 let pb = NSPasteboard.general
                 pb.clearContents()
                 pb.writeObjects([image])
-                page.post(["type": "captured", "ok": true, "msg": "📋 클립보드에 복사했어요"])
+                page.post(["type": "captured", "ok": true, "msg": "📋", "code": "capCopied"])
             }
         }
     }
 
     static func alert(_ text: String) {
         let a = NSAlert()
-        a.messageText = "데스크펫"
+        a.messageText = L("데스크펫", "DeskPet")
         a.informativeText = text
         a.runModal()
     }
@@ -154,6 +166,11 @@ final class ShellSettings {
     var topmost: Bool {
         get { d.object(forKey: "topmost") as? Bool ?? true }
         set { d.set(newValue, forKey: "topmost") }
+    }
+    /// 처음엔 맥 언어 설정으로 추정, 이후엔 페이지(설정의 언어 선택)가 알려준 값
+    var lang: String {
+        get { d.string(forKey: "lang") ?? ((Locale.preferredLanguages.first ?? "ko").hasPrefix("ko") ? "ko" : "en") }
+        set { d.set(newValue, forKey: "lang") }
     }
     var scale: Double {
         get { let v = d.double(forKey: "scale"); return v > 0 ? v : 1 }

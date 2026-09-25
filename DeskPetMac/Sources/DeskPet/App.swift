@@ -13,7 +13,7 @@ enum DeskPetMain {
 /// 메뉴바(🐾) 앱. Dock 아이콘은 없음(Info.plist의 LSUIElement).
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
-    private let autoItem = NSMenuItem(title: "🚀 로그인 시 실행", action: nil, keyEquivalent: "")
+    private let autoItem = NSMenuItem()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // 두 개 실행되면 같은 세이브를 서로 덮어쓰므로 하나만 허용
@@ -41,23 +41,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     // MARK: 메뉴바 아이콘
+    private let windowItem = NSMenuItem(), freeItem = NSMenuItem(), settingsItem = NSMenuItem(),
+                poolItem = NSMenuItem(), quitItem = NSMenuItem()
+
     private func setupStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "🐾"
-        statusItem.button?.toolTip = "데스크펫"
 
         let menu = NSMenu()
         menu.delegate = self
-        menu.addItem(item("🐾 창 모드", #selector(showWindowMode)))
-        menu.addItem(item("🏃 자유 모드", #selector(showFreeMode)))
-        menu.addItem(item("⚙ 설정", #selector(openSettings)))
-        menu.addItem(item("💬 대사 풀", #selector(openPool)))
+        for (i, sel) in [(windowItem, #selector(showWindowMode)), (freeItem, #selector(showFreeMode)),
+                         (settingsItem, #selector(openSettings)), (poolItem, #selector(openPool))] {
+            i.target = self; i.action = sel; menu.addItem(i)
+        }
         autoItem.target = self
         autoItem.action = #selector(toggleAutostart)
         menu.addItem(autoItem)
         menu.addItem(.separator())
-        menu.addItem(item("종료", #selector(quit)))
+        quitItem.target = self; quitItem.action = #selector(quit)
+        menu.addItem(quitItem)
         statusItem.menu = menu
+        applyLang()
+        Shell.shared.onLangChange = { [weak self] in self?.applyLang() }
+    }
+
+    /// 메뉴 글자를 현재 언어로
+    private func applyLang() {
+        windowItem.title = Shell.L("🐾 창 모드", "🐾 Window mode")
+        freeItem.title = Shell.L("🏃 자유 모드", "🏃 Free mode")
+        settingsItem.title = Shell.L("⚙ 설정", "⚙ Settings")
+        poolItem.title = Shell.L("💬 대사 풀", "💬 Dialogue pool")
+        autoItem.title = Shell.L("🚀 로그인 시 실행", "🚀 Launch at login")
+        quitItem.title = Shell.L("종료", "Quit")
+        statusItem.button?.toolTip = Shell.L("데스크펫", "DeskPet")
     }
 
     private func item(_ title: String, _ action: Selector) -> NSMenuItem {
@@ -77,7 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     @objc private func quit() { NSApp.terminate(nil) }
     @objc private func toggleAutostart() {
         do { try Autostart.set(!Autostart.isOn) }
-        catch { Shell.alert("로그인 항목을 바꾸지 못했어요.\n\n\(error.localizedDescription)") }
+        catch { Shell.alert(Shell.L("로그인 항목을 바꾸지 못했어요.", "Couldn't change the login item.") + "\n\n\(error.localizedDescription)") }
     }
 
     // MARK: 메인 메뉴
