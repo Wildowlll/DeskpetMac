@@ -36,11 +36,20 @@ jobs:
           mkdir -p smoke
           screencapture -x smoke/screen.png || echo "screencapture 실패"
           echo "----- 실행 중인 프로세스 -----"
-          pgrep -lf DeskPet || echo "(실행 중 아님)"
+          if pgrep -x DeskPet; then
+            # 멈춰 있다면 어디서 멈췄는지: 3초간 스레드 스택 샘플링
+            sample DeskPet 3 -file smoke/sample.txt >/dev/null 2>&1 || true
+            echo "----- 메인 스레드 스택 (앞부분) -----"
+            sed -n '/Call graph:/,/^$/p' smoke/sample.txt | head -60 || true
+          else
+            echo "(실행 중 아님 — 꺼졌거나 죽음)"
+          fi
+          echo "----- 크래시 리포트 -----"
+          ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i deskpet || echo "(없음)"
+          for f in ~/Library/Logs/DiagnosticReports/*DeskPet*; do [ -f "$f" ] && { cp "$f" smoke/; head -c 4000 "$f"; }; done
           echo "----- DeskPet.log -----"
           cat ~/Library/Logs/DeskPet.log || echo "(로그 없음 — 앱 코드가 아예 시작 안 됨)"
           cp ~/Library/Logs/DeskPet.log smoke/ 2>/dev/null || true
-          ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | grep -i deskpet && cp ~/Library/Logs/DiagnosticReports/*DeskPet* smoke/ 2>/dev/null || true
           pkill -x DeskPet || true
           grep -q "page loaded" smoke/DeskPet.log && echo "✅ 창 로딩 확인" || { echo "::warning::페이지 로딩이 확인되지 않았어요"; exit 1; }
 
