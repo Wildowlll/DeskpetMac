@@ -16,11 +16,14 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
     private var loaded = false
 
     init(query: String, transparent: Bool) {
+        Log.write("web: config")
         let cfg = WKWebViewConfiguration()
         cfg.websiteDataStore = .default()          // 모든 창이 같은 localStorage(세이브)를 씀
         cfg.preferences.setValue(true, forKey: "developerExtrasEnabled")   // 문제 생기면 우클릭 → 요소 검사로 확인 가능
+        Log.write("web: creating WKWebView")
         webView = DPWebView(frame: .zero, configuration: cfg)
         super.init()
+        Log.write("web: WKWebView ready")
 
         cfg.userContentController.add(WeakHandler(self), name: "deskpet")
         // 페이지 JS 오류를 앱 로그로 (맥에서 문제 생겼을 때 원인 추적용)
@@ -49,6 +52,7 @@ final class WebPage: NSObject, WKScriptMessageHandler, WKUIDelegate, WKNavigatio
         }
         var comps = URLComponents(url: web.appendingPathComponent("index.html"), resolvingAgainstBaseURL: false)!
         comps.query = query
+        Log.write("web: load \(comps.url?.absoluteString ?? "nil")")
         webView.loadFileURL(comps.url!, allowingReadAccessTo: web)
     }
 

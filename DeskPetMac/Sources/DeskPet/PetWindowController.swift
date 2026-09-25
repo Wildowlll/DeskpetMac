@@ -19,13 +19,16 @@ final class PetWindowController: NSObject, HostWindow, NSWindowDelegate {
     private var scale: CGFloat
 
     override init() {
+        Log.write("pet: init")
         let s = Shell.shared.settings
         scale = CGFloat(s.scale)
         window = BorderlessWindow(
             contentRect: NSRect(x: 0, y: 0, width: Self.baseW * scale, height: Self.baseH * scale),
             styleMask: [.borderless], backing: .buffered, defer: false)
+        Log.write("pet: window created")
         page = WebPage(query: "mode=window&top=" + (s.topmost ? "1" : "0"), transparent: false)
         super.init()
+        Log.write("pet: page created")
 
         window.isReleasedWhenClosed = false
         window.hasShadow = true
@@ -43,11 +46,13 @@ final class PetWindowController: NSObject, HostWindow, NSWindowDelegate {
             window.setFrameOrigin(NSPoint(x: vf.maxX - window.frame.width - 24, y: vf.minY + 24))
         }
 
+        Log.write("pet: positioned \(window.frame)")
         page.onLoaded = { [weak self] in self?.onReady?() }
         page.onMessage = { [weak self] m in self?.handle(m) }
     }
 
     func show() {
+        Log.write("pet: show")
         // 모니터를 뺐거나 해상도가 바뀌어 창이 화면 밖에 있으면 오른쪽 아래로 되돌림
         if !NSScreen.screens.contains(where: { $0.visibleFrame.intersects(window.frame) }),
            let vf = NSScreen.main?.visibleFrame {
@@ -56,6 +61,7 @@ final class PetWindowController: NSObject, HostWindow, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
         window.orderFrontRegardless()   // 메뉴바 앱이 아직 활성화 전이어도 무조건 앞에
         NSApp.activate(ignoringOtherApps: true)
+        Log.write("pet: shown visible=\(window.isVisible)")
         page.post(["type": "hostHidden", "on": false])
     }
 
