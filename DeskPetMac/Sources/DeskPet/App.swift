@@ -10,13 +10,14 @@ enum DeskPetMain {
     static func main() {
         Log.start()
         let app = NSApplication.shared
-        app.setActivationPolicy(.accessory)   // Dock 아이콘 없는 메뉴바 앱 (Info.plist LSUIElement와 같음)
+        // Dock 아이콘 있는 일반 앱으로 실행 — 메뉴바 🐾가 노치에 가려져도 Dock에서 찾고 끌 수 있게
+        app.setActivationPolicy(.regular)
         app.delegate = delegate
         app.run()
     }
 }
 
-/// 메뉴바(🐾) 앱. Dock 아이콘은 없음(Info.plist의 LSUIElement).
+/// Dock 아이콘 + 메뉴바(🐾) 둘 다 있는 앱.
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let autoItem = NSMenuItem()
@@ -28,20 +29,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let others = NSRunningApplication.runningApplications(withBundleIdentifier: id)
                 .filter { $0 != NSRunningApplication.current }
             if let other = others.first {
-                other.activate(options: [])
-                NSApp.terminate(nil)
-                return
+                Log.write("another instance running (pid \(other.processIdentifier)) at \(other.bundleURL?.path ?? "?")")
+                NSApp.activate(ignoringOtherApps: true)
+                let a = NSAlert()
+                a.messageText = Shell.L("데스크펫이 이미 실행 중이에요", "DeskPet is already running")
+                a.informativeText = Shell.L("화면에 안 보인다면 이전 실행이 멈춘 상태일 수 있어요.\n기존 것을 끄고 새로 시작할까요?",
+                                            "If you can't see it, the previous one may be stuck.\nQuit it and start fresh?")
+                a.addButton(withTitle: Shell.L("기존 것 끄고 시작", "Quit it and start"))
+                a.addButton(withTitle: Shell.L("그만두기", "Cancel"))
+                if a.runModal() == .alertFirstButtonReturn {
+                    other.forceTerminate()
+                    var n = 0
+                    while !other.isTerminated && n < 30 { RunLoop.current.run(until: Date().addingTimeInterval(0.1)); n += 1 }
+                } else {
+                    other.activate(options: [])
+                    NSApp.terminate(nil)
+                    return
+                }
             }
         }
         setupMainMenu()
         setupStatusItem()
         Notifier.setup()
         Shell.shared.open(Shell.shared.settings.mode)
+        NSApp.activate(ignoringOtherApps: true)
+        Log.write("startup done")
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
-    // 이미 실행 중일 때 응용 프로그램 폴더에서 또 더블클릭하면 → 숨어 있던 펫 창을 다시 보여줌
+    // Dock 아이콘 우클릭 메뉴
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let m = NSMenu()
+        m.addItem(item(Shell.L("🐾 창 모드", "🐾 Window mode"), #selector(showWindowMode)))
+        m.addItem(item(Shell.L("🏃 자유 모드", "🏃 Free mode"), #selector(showFreeMode)))
+        m.addItem(item(Shell.L("⚙ 설정", "⚙ Settings"), #selector(openSettings)))
+        m.addItem(item(Shell.L("💬 대사 풀", "💬 Dialogue pool"), #selector(openPool)))
+        return m
+    }
+
+    // Dock 아이콘 클릭, 또는 이미 실행 중일 때 응용 프로그램 폴더에서 또 더블클릭하면 → 숨어 있던 펫 창을 다시 보여줌
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         Shell.shared.reveal()
         return false
@@ -110,13 +137,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     // MARK: 메인 메뉴
-    // 메뉴바 앱이라 화면에 메뉴는 안 보이지만, 이게 있어야 입력칸에서 Cmd+C/V/A가 동작함
+    // 앱이 앞에 있을 때 화면 맨 위 메뉴. 편집 메뉴가 있어야 입력칸에서 Cmd+C/V/A가 동작함
     private func setupMainMenu() {
         let main = NSMenu()
 
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        appMenu.addItem(withTitle: "데스크펫 종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenu.addItem(item(Shell.L("🐾 창 모드", "🐾 Window mode"), #selector(showWindowMode)))
+        appMenu.addItem(item(Shell.L("🏃 자유 모드", "🏃 Free mode"), #selector(showFreeMode)))
+        let st = item(Shell.L("⚙ 설정…", "⚙ Settings…"), #selector(openSettings))
+        st.keyEquivalent = ","
+        appMenu.addItem(st)
+        appMenu.addItem(item(Shell.L("💬 대사 풀", "💬 Dialogue pool"), #selector(openPool)))
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: Shell.L("데스크펫 가리기", "Hide DeskPet"), action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        appMenu.addItem(withTitle: Shell.L("데스크펫 종료", "Quit DeskPet"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appItem.submenu = appMenu
         main.addItem(appItem)
 

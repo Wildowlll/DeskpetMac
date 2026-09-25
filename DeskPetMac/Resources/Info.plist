@@ -21,9 +21,6 @@
     <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
-    <!-- Dock 아이콘 없이 메뉴바(🐾)에만 상주 -->
-    <key>LSUIElement</key>
-    <true/>
     <key>NSHighResolutionCapable</key>
     <true/>
     <key>CFBundleDevelopmentRegion</key>
