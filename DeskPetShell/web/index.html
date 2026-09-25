@@ -1,0 +1,2703 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>🐾 데스크펫</title>
+<!--
+  데스크펫 윈도우판 — 한 파일에 세 가지 화면:
+    ?mode=window   레트로 다마고치 창 (기본)
+    ?mode=free     바탕화면 자유 모드 (투명 오버레이)
+    ?mode=settings 설정 창
+  게임 로직(createEngine)은 웹판 deskpet.html의 runMain과 같은 규칙·수치·저장 키를 쓴다.
+-->
+<script src="lib/html2canvas.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=M+PLUS+Rounded+1c:wght@400;700&display=swap');
+:root {
+  --ink: #2e2620;
+  --frame: #cfc6b4; --frame-hi: #fbf7ee; --frame-lo: #847a6b;
+  --title-a: #ffc56e; --title-b: #ee9530;
+  --msg: #fff6c4; --panel: #fffaf3; --line: #e8d9c8; --bad: #d8452f;
+  /* 설정 창(원본 팔레트) */
+  --cream: #fdf6e3; --brown: #4a3728; --brown2: #2a1f18;
+  --yellow: #ffd54f; --red: #ef5350; --green: #7bc67e;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { color: var(--ink); font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif; }
+button { font: inherit; color: inherit; }
+body.mode-window, body.mode-free { overflow: hidden; user-select: none; -webkit-user-select: none; }
+body.mode-window { width: 360px; height: 300px; background: var(--frame); }
+body.mode-free   { width: 100vw; height: 100vh; background: transparent; }   /* 오버레이 핵심: 투명 */
+body:not(.mode-window) #win, body:not(.mode-free) #free, body:not(.mode-settings) #settings-page, body:not(.mode-pool) #pool-page { display: none !important; }
+
+/* =====================================================================
+   공용: 펫 스프라이트
+   .pet(위치·크기) > .pet-flip(좌우) > .pet-sq(튀어오르기 스쿼시) > 동글이(.pet-art) 또는 이미지(.pet-img)
+   ===================================================================== */
+.pet { position: absolute; cursor: pointer; }
+.pet-flip, .pet-sq { position: absolute; inset: 0; }
+.pet.flip .pet-flip { transform: scaleX(-1); }
+.pet-sq { transform-origin: 50% 100%; }
+.pet-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%;
+           image-rendering: auto; pointer-events: none; }   /* 크게 줄여 보여주므로 부드러운 보간 (pixelated는 계단 현상) */
+.pet-art { position: absolute; left: 0; bottom: 0; width: 72px; height: 64px; transform: scale(var(--s)); transform-origin: 0 100%; }
+.pet .body {
+  position: absolute; inset: 0; border: 3px solid var(--ink);
+  border-radius: 50% 50% 44% 44% / 60% 60% 40% 40%;
+  animation: bob 1.2s ease-in-out infinite alternate;
+}
+.pet .eye { position: absolute; top: 24px; width: 7px; height: 9px; background: var(--ink); border-radius: 50%; }
+.pet .eye.l { left: 22px; } .pet .eye.r { left: 40px; }
+.pet .blush { position: absolute; top: 36px; left: 14px; width: 40px; height: 6px; opacity: 0;
+  background: radial-gradient(circle at 6px 3px, #f7a0a0 3px, transparent 4px), radial-gradient(circle at 34px 3px, #f7a0a0 3px, transparent 4px); }
+.pet .tag { position: absolute; display: none; pointer-events: none; line-height: 1; font-weight: bold; }
+.pet .zzz    { top: -.9em; right: -.4em; font-size: .7em; color: #7986cb; }
+.pet .stink  { top: -.6em; left: -.2em; font-size: .7em; color: #7b8a3a; }
+.pet .sweat  { top: -.1em; right: -.2em; font-size: .6em; }
+.pet .selmark{ top: -1.1em; left: 50%; margin-left: -.3em; font-size: .5em; color: #ee9530; }
+
+.pet.walk .body  { animation-duration: .5s; }
+.pet.sleep .body { animation: breathe 2.4s ease-in-out infinite alternate; }
+.pet.sleep .eye  { height: 2px; top: 28px; border-radius: 1px; }
+.pet.sleep .zzz  { display: block; animation: floaty 1.6s ease-in-out infinite; }
+.pet.eat .body,  .pet.eat .pet-img  { animation: nod .28s ease-in-out infinite; }
+.pet.play .body, .pet.play .pet-img { animation: hop .45s ease-out infinite; }
+.pet.pat .body,  .pet.pat .pet-img  { animation: squish .35s ease-out 2; }
+.pet.bath .body, .pet.bath .pet-img { animation: shake .18s linear infinite; }
+.pet.pat .blush, .pet.play .blush { opacity: 1; }
+.pet.pat .eye, .pet.play .eye { height: 4px; top: 27px; border-radius: 4px 4px 0 0; }   /* ^^ 눈 */
+.pet.dirty .body { background-image:
+  radial-gradient(circle at 20% 70%, #a4865e 4px, transparent 5px),
+  radial-gradient(circle at 70% 35%, #a4865e 3px, transparent 4px),
+  radial-gradient(circle at 55% 80%, #a4865e 3px, transparent 4px); }
+.pet.dirty:not(.sleep) .stink { display: block; animation: floaty 1.2s ease-in-out infinite; }
+.pet.dirty.has-img .pet-img { filter: sepia(.45) brightness(.92); }
+.pet.sick .body { background-color: #d9e6b8 !important; }
+.pet.sick.has-img .pet-img { filter: saturate(.5) hue-rotate(35deg); }
+.pet.sick:not(.sleep) .sweat { display: block; }
+.pet.sel .selmark { display: block; animation: floaty 1s ease-in-out infinite; }
+
+@keyframes bob     { to { transform: translateY(-4px); } }
+@keyframes breathe { to { transform: scaleY(.94) translateY(2px); } }
+@keyframes floaty  { 50% { transform: translateY(-4px); opacity: .6; } }
+@keyframes nod     { 50% { transform: translateY(4px) scaleY(.94); } }
+@keyframes hop     { 50% { transform: translateY(-12px); } }
+@keyframes squish  { 40% { transform: scale(1.12, .86); } }
+@keyframes shake   { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+
+.fx { position: absolute; pointer-events: none; font-size: 15px; z-index: 300; animation: fxUp 1.2s ease-out forwards; }
+@keyframes fxUp { from { transform: translate(0, 0) scale(.6); opacity: 0; } 20% { opacity: 1; transform: translate(0, -6px) scale(1); }
+                  to { transform: translate(var(--dx), -38px) scale(.8); opacity: 0; } }
+.pop { position: absolute; font-size: 22px; pointer-events: none; z-index: 310; animation: iPop 1.4s ease-out forwards; }
+@keyframes iPop { 0% { opacity: 1; transform: translate(-50%, -50%) scale(.4); } 30% { transform: translate(-50%, -50%) scale(1.3); }
+                  100% { opacity: 0; transform: translate(-50%, -80%) scale(1); } }
+.confetti { position: absolute; width: 6px; height: 6px; border-radius: 2px; pointer-events: none; z-index: 305; animation: confettiFall linear forwards; }
+@keyframes confettiFall { 0% { opacity: 1; transform: translateY(0) rotate(0); } 100% { opacity: 0; transform: translateY(150px) rotate(720deg); } }
+
+/* =====================================================================
+   창 모드 (360 x 300)
+   ===================================================================== */
+.bevel-out { border: 2px solid; border-color: var(--frame-hi) var(--frame-lo) var(--frame-lo) var(--frame-hi); }
+.bevel-in  { border: 2px solid; border-color: var(--frame-lo) var(--frame-hi) var(--frame-hi) var(--frame-lo); }
+#win { position: relative; width: 360px; height: 300px; padding: 4px; display: flex; flex-direction: column; gap: 4px; }
+
+#titlebar { height: 26px; flex: none; display: flex; align-items: center; gap: 3px; padding: 0 3px 0 7px;
+  background: linear-gradient(var(--title-a), var(--title-b)); border: 2px solid var(--ink); border-radius: 7px; cursor: default; }
+#tb-name { flex: 1; margin-left: 3px; font-weight: bold; font-size: 13px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  text-shadow: 1px 0 var(--ink), -1px 0 var(--ink), 0 1px var(--ink), 0 -1px var(--ink); }
+.tb-btn { width: 21px; height: 18px; padding: 0; line-height: 13px; font-size: 11px; font-weight: bold; background: var(--frame); cursor: pointer; flex: none; }
+.tb-btn:active, .tool:active:not(:disabled) { border-color: var(--frame-lo) var(--frame-hi) var(--frame-hi) var(--frame-lo); }
+#btn-pin.on { background: #ffe3a3; }
+
+#main { display: flex; gap: 4px; height: 164px; flex: none; }
+#room { position: relative; width: 240px; height: 164px; overflow: hidden; background: #000; flex: none; }
+#room .wall { position: absolute; left: 0; right: 0; top: 0; height: 74px;
+  background: repeating-linear-gradient(90deg, #f4e3c6 0 14px, #efd9b6 14px 28px); }
+#room .baseboard { position: absolute; left: 0; right: 0; top: 70px; height: 6px; background: #b98a5a;
+  border-top: 1px solid #8e6440; border-bottom: 1px solid #8e6440; }
+#room .floor { position: absolute; left: 0; right: 0; top: 76px; bottom: 0;
+  background: repeating-linear-gradient(0deg, #d6a36c 0 12px, #c99560 12px 13px); }
+#room .rug { position: absolute; left: 50px; top: 104px; width: 136px; height: 46px; border-radius: 50%;
+  background: radial-gradient(ellipse, #e98e8e 0 45%, #f4b3a8 46% 62%, #e98e8e 63%); }
+#room .pane { position: absolute; left: 14px; top: 9px; width: 62px; height: 48px; border: 4px solid #fff; outline: 2px solid #b98a5a; overflow: hidden; }
+#room .pane::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1px; background: #fff; z-index: 2; }
+#sky { position: absolute; inset: 0; transition: background 3s; }
+#sky .cel { position: absolute; right: 3px; top: 2px; font-size: 11px; }
+#sky .star { position: absolute; width: 2px; height: 2px; background: #fff; border-radius: 50%; animation: twinkle 2s infinite alternate; }
+#sky .sp { position: absolute; top: -10px; font-size: 8px; animation: fallDown linear forwards; }
+@keyframes twinkle { from { opacity: .3; } to { opacity: 1; } }
+@keyframes fallDown { to { transform: translateY(58px) rotate(300deg); opacity: .2; } }
+#room .shelf { position: absolute; left: 116px; top: 30px; width: 44px; height: 5px; background: #b98a5a; }
+#room .plant { position: absolute; left: 122px; top: 12px; font-size: 16px; }
+#clock { position: absolute; right: 6px; top: 6px; padding: 1px 5px 0; z-index: 3;
+  background: #121212; color: #b9ff6f; border: 2px solid #555; border-radius: 3px;
+  font-family: Consolas, "Courier New", monospace; font-weight: bold; font-size: 14px; letter-spacing: 1px; }
+#clock small { font-size: 8px; margin-right: 3px; vertical-align: 3px; letter-spacing: 0; }
+#date-bg { position: absolute; inset: 0; z-index: 5; opacity: 0; pointer-events: none; transition: opacity 1s; }
+#date-bg.show { opacity: 1; }
+#date-bg .date-ground { position: absolute; left: 0; right: 0; bottom: 0; height: 52%; }
+.bowl { position: absolute; font-size: 16px; pointer-events: none; }
+#dim { position: absolute; inset: 0; background: #0b1030; opacity: 0; pointer-events: none; transition: opacity 1.2s; z-index: 250; }
+#room.sleeping #dim { opacity: .5; }
+#hg { position: absolute; left: 50%; bottom: 3px; transform: translateX(-50%); font-size: 10px; z-index: 260; pointer-events: none; letter-spacing: 1px; }
+#hg .empty { filter: grayscale(1); opacity: .45; }
+#banner { position: absolute; left: 50%; top: 46%; transform: translate(-50%, -50%); z-index: 320; pointer-events: none;
+  background: var(--brown); color: var(--cream); font-size: 12px; line-height: 1.5; text-align: center;
+  padding: 7px 12px; border-radius: 10px; max-width: 220px; opacity: 0; transition: opacity .3s; }
+#banner.show { opacity: 1; }
+#add-char { position: absolute; right: 6px; bottom: 6px; width: 46px; height: 46px; z-index: 240;
+  border: 2px dashed var(--ink); border-radius: 9px; background: rgba(255,255,255,.75); cursor: pointer;
+  font-size: 10px; line-height: 1.25; padding: 0; }
+#add-char:hover { background: rgba(255,249,240,.95); }
+#add-char b { display: block; font-size: 17px; }
+
+#stats { flex: 1; background: var(--frame); padding: 2px; display: flex; flex-direction: column; min-width: 0; }
+#st-head { height: 20px; display: flex; align-items: center; justify-content: center; gap: 2px; background: #bdb3a0;
+  border: 1px solid var(--frame-lo); font-size: 11px; font-weight: bold; }
+#st-head span { flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.selbtn { border: 0; background: none; padding: 0 2px; font-size: 9px; cursor: pointer; }
+#stats table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: -1px; }
+#stats td { border: 1px solid var(--frame-lo); text-align: center; background: var(--frame-hi); padding: 1px 0; height: 19px; }
+#stats td.v { font-weight: bold; font-family: Consolas, monospace; font-size: 13px; }
+#stats td.v.bad { color: var(--bad); animation: blink .9s infinite; }
+@keyframes blink { 50% { opacity: .35; } }
+#st-age, #st-aff { font-size: 10.5px; text-align: center; white-space: nowrap; overflow: hidden; }
+#st-age { margin-top: auto; padding-top: 2px; }
+
+#toolbar { position: relative; height: 36px; flex: none; display: flex; align-items: center; gap: 3px; padding: 0 3px; background: var(--frame); }
+.tool { width: 33px; height: 28px; padding: 0; font-size: 16px; line-height: 20px; cursor: pointer; background: var(--frame); flex: none; }
+.tool:hover:not(:disabled) { background: #ddd4c2; }
+.tool:disabled { opacity: .4; cursor: not-allowed; }
+#toolbar .sep { flex: 1; }
+#toolbar .tool.mode { width: auto; padding: 0 5px; font-size: 11px; }
+#sp-pop { position: absolute; right: 44px; bottom: 34px; display: none; gap: 4px; padding: 5px; z-index: 400;
+  background: var(--panel); border: 2px solid var(--ink); border-radius: 9px; box-shadow: 0 3px 0 rgba(0,0,0,.18); }
+#sp-pop.show { display: flex; }
+.sp-btn { width: 56px; padding: 4px 0; font-size: 11px; line-height: 1.3; border: 2px solid var(--ink); border-radius: 7px;
+  background: linear-gradient(135deg, #fff9f0, #fff0f5); cursor: pointer; }
+.sp-btn:hover:not(.locked):not(.cooldown) { background: linear-gradient(135deg, #ffe0f0, #fff0b0); }
+.sp-btn.locked { opacity: .45; filter: grayscale(.5); cursor: not-allowed; }
+.sp-btn.cooldown { opacity: .6; cursor: not-allowed; }
+.sp-btn small { display: block; font-size: 9px; opacity: .75; min-height: 11px; }
+
+#msg { flex: 1; background: var(--msg); padding: 4px 8px; font-size: 12.5px; line-height: 1.5; overflow: hidden; }
+#msg .who { font-weight: bold; margin-right: 4px; }
+#msg .sys { color: #7a6a52; font-style: italic; }
+#msg .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#msg .line.old { opacity: .5; }
+#msg .line.new { animation: fadeIn .25s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(3px); } }
+
+/* =====================================================================
+   자유 모드
+   ===================================================================== */
+#free .pet { cursor: grab; }
+#free .pet.dragging { cursor: grabbing; }
+.fbubble { position: absolute; padding: 5px 10px; max-width: 200px; z-index: 450;   /* 메뉴(400)보다 위: 대사가 가려지지 않게 */
+  background: #fff; border: 2px solid var(--ink); border-radius: 12px; font-size: 13px; line-height: 1.4; text-align: center;
+  pointer-events: none; opacity: 0; transition: opacity .3s; }
+.fbubble.show { opacity: 1; }
+.fbubble::after { content: ''; position: absolute; bottom: -8px; left: 50%; transform: translateX(-50%);
+  border: 6px solid transparent; border-top-color: var(--ink); }
+#fbanner { position: absolute; z-index: 460; pointer-events: none; background: var(--brown); color: var(--cream);
+  font-size: 13px; line-height: 1.5; text-align: center; padding: 8px 14px; border-radius: 12px; opacity: 0; transition: opacity .3s; }
+#fbanner.show { opacity: 1; }
+#menu { position: absolute; width: 246px; padding: 10px; z-index: 400; display: none;
+  background: var(--panel); border: 2px solid var(--ink); border-radius: 14px; box-shadow: 0 4px 0 rgba(0,0,0,.15); font-size: 12.5px; }
+#menu.show { display: block; }
+#m-name { font-weight: bold; font-size: 14px; }
+#m-sub, #m-aff { font-size: 11px; opacity: .8; margin-bottom: 6px; }
+.stat { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.stat span { width: 48px; }
+.bar { flex: 1; height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: #f2a65a; transition: width .5s; }
+.bar i.bad { background: var(--bad); }
+.m-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; margin-top: 8px; }
+.m-grid button, .m-foot button { padding: 5px 0; cursor: pointer; background: #fff; border: 2px solid var(--ink); border-radius: 8px; font-size: 11.5px; }
+.m-grid button:hover:not(:disabled):not(.locked) { background: #ffeeda; }
+.m-grid button:disabled, .m-grid button.locked { opacity: .45; cursor: not-allowed; }
+.m-grid button.cooldown { opacity: .6; }
+.m-grid button small { display: block; font-size: 9px; opacity: .7; }
+#m-special { border-top: 2px dashed var(--line); padding-top: 6px; }
+.m-foot { display: flex; gap: 5px; margin-top: 8px; }
+.m-foot button { flex: 1; font-size: 11px; padding: 3px 0; }
+
+/* =====================================================================
+   설정 창 (원본 스타일)
+   ===================================================================== */
+body.mode-settings { background: var(--cream); overflow-y: auto; min-height: 100vh; }
+#settings-page { display: flex; flex-direction: column; font-family: 'M PLUS Rounded 1c', "Malgun Gothic", sans-serif; color: var(--brown); background: var(--cream); min-height: 100vh; }
+#set-titlebar { background: var(--brown); color: var(--cream); font-family: 'DotGothic16', monospace; font-size: 14px;
+  padding: 10px 16px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+body.app #set-titlebar { display: none; }            /* 윈도우판: 네이티브 제목 표시줄 사용 */
+#set-close { background: var(--red); border: none; border-radius: 50%; width: 22px; height: 22px; color: #fff; font-size: 12px; font-weight: bold; cursor: pointer; }
+#set-tabs { display: flex; background: #fff9f0; border-bottom: 2px solid var(--brown); position: sticky; top: 42px; z-index: 9; overflow-x: auto; }
+body.app #set-tabs { top: 0; }
+.set-tab { flex-shrink: 0; padding: 11px 14px; font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 12px; cursor: pointer; border: none; background: none;
+  color: var(--brown); opacity: .4; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; }
+.set-tab.active { opacity: 1; border-bottom-color: var(--brown); }
+.set-body { padding: 18px; }
+.tab-panel { display: none; flex-direction: column; gap: 16px; padding-top: 4px; }
+.tab-panel.active { display: flex; }
+.set-section { display: flex; flex-direction: column; gap: 7px; }
+.set-label { font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 12px; }
+.set-label small { opacity: .55; font-size: 10px; }
+.set-input { width: 100%; font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 12px; border: 2px solid var(--brown); border-radius: 8px;
+  padding: 9px 11px; background: #fff; color: var(--brown); outline: none; resize: none; }
+.set-input:focus { border-color: var(--green); }
+.size-btns, .preset-btns { display: flex; gap: 7px; }
+.sz-btn, .ps-btn, .data-btn { flex: 1; background: #fff; border: 2px solid var(--brown); border-radius: 7px; font-family: 'DotGothic16', "Malgun Gothic", monospace;
+  font-size: 11px; padding: 8px 0; cursor: pointer; color: var(--brown); text-align: center; box-shadow: 2px 2px 0 var(--brown); line-height: 1.5; }
+.sz-btn:hover, .ps-btn:hover, .data-btn:hover { background: var(--yellow); }
+.sz-btn.active, .ps-btn.active { background: var(--brown); color: var(--cream); box-shadow: none; }
+.data-btn.danger { background: var(--red); color: #fff; border-color: #b71c1c; box-shadow: 2px 2px 0 #b71c1c; }
+.img-upload-box { border: 2px dashed var(--brown); border-radius: 10px; padding: 16px; text-align: center; cursor: pointer; background: #fff;
+  font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 12px; display: flex; flex-direction: column; align-items: center; gap: 7px; }
+.img-upload-box:hover { background: #fff9f0; }
+.img-preview { width: 72px; height: 72px; object-fit: contain; border-radius: 6px; }
+.set-save { background: var(--brown); color: var(--cream); border: none; border-radius: 9px; padding: 12px; font-family: 'DotGothic16', "Malgun Gothic", monospace;
+  font-size: 13px; cursor: pointer; box-shadow: 2px 2px 0 var(--brown2); width: 100%; }
+.set-save:hover { background: #5d4437; }
+.set-save.ok { background: var(--green) !important; }
+.divider { border: none; border-top: 1.5px dashed #d4c9b0; margin: 2px 0; width: 100%; }
+.set-note { font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 10.5px; opacity: .65; line-height: 1.6; }
+.chk { font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 11px; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+.chk input, input[type=range] { accent-color: var(--brown); }
+.diary-item, .achv-item, .log-item { background: #fff; border: 1.5px solid #e0d5c0; border-radius: 9px; }
+.diary-item { padding: 11px 13px; display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.diary-date { font-size: 10px; opacity: .55; }
+.diary-body { font-size: 12px; line-height: 1.7; }
+#achv-count { font-family: 'DotGothic16', "Malgun Gothic", monospace; font-size: 12px; text-align: right; }
+#achv-list { display: flex; flex-direction: column; gap: 6px; }
+.achv-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; }
+.achv-item.locked { opacity: .38; filter: grayscale(1); }
+.achv-emoji { font-size: 20px; }
+.achv-name { font-size: 12px; font-weight: bold; }
+.achv-desc { font-size: 10px; opacity: .55; }
+#log-filter { display: flex; gap: 7px; }
+.log-filter-btn { background: #fff; border: 1.5px solid var(--brown); border-radius: 6px; font-size: 11px; padding: 5px 11px; cursor: pointer; color: var(--brown); }
+.log-filter-btn.active { background: var(--brown); color: var(--cream); }
+#log-list { display: flex; flex-direction: column; gap: 8px; }
+.log-item { padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; }
+.log-meta { display: flex; justify-content: space-between; }
+.log-who { font-size: 11px; font-weight: bold; }
+.log-time, .log-trigger { font-size: 10px; opacity: .55; }
+.log-line { font-size: 12px; }
+.log-fail { color: #aaa; }
+.log-empty { font-size: 12px; opacity: .5; text-align: center; padding: 24px; }
+
+/* =====================================================================
+   대사 풀 창
+   ===================================================================== */
+body.mode-pool { background: var(--cream); height: 100vh; overflow: hidden; }
+#pool-page { height: 100vh; display: flex; flex-direction: column; gap: 10px; padding: 14px;
+  font-family: 'M PLUS Rounded 1c', "Malgun Gothic", sans-serif; color: var(--brown); }
+.pl-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+#pl-chars { display: flex; gap: 6px; }
+#pl-total { font-size: 11px; opacity: .65; }
+.pl-main { flex: 1; min-height: 0; display: flex; gap: 10px; }
+#pl-trigs { width: 150px; flex: none; overflow-y: auto; display: flex; flex-direction: column; gap: 3px; }
+.pl-trig { display: flex; justify-content: space-between; align-items: center; padding: 6px 9px; cursor: pointer;
+  background: #fff; border: 1.5px solid #e0d5c0; border-radius: 7px; font-size: 12px; color: var(--brown); text-align: left; }
+.pl-trig:hover { background: #fff9f0; }
+.pl-trig.active { background: var(--brown); color: var(--cream); border-color: var(--brown); }
+.pl-trig b { font-family: Consolas, monospace; font-size: 11px; }
+.pl-trig b.zero { opacity: .4; }
+.pl-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.pl-head { display: flex; justify-content: space-between; align-items: center; }
+.pl-head b { font-size: 13px; }
+.pl-small { font-size: 11px; background: none; border: 1.5px solid #d4c9b0; border-radius: 6px; padding: 3px 8px; cursor: pointer; color: var(--brown); }
+#pl-lines { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 5px; padding-right: 2px; }
+.pl-row { display: flex; align-items: center; gap: 5px; }
+.pl-row.fallback { background: #fff; border: 1.5px dashed #d4c9b0; border-radius: 7px; padding: 6px 8px; opacity: .75; }
+.pl-text { flex: 1; font-size: 12.5px; }
+.pl-input { flex: 1; min-width: 0; font: inherit; font-size: 12.5px; color: var(--brown); background: #fff;
+  border: 1.5px solid #e0d5c0; border-radius: 7px; padding: 6px 8px; outline: none; }
+.pl-input:focus { border-color: var(--green); }
+.pl-ico { flex: none; width: 26px; height: 26px; border-radius: 6px; border: 1.5px solid #e0d5c0; background: #fff; cursor: pointer; font-size: 11px; color: var(--brown); }
+.pl-ico:hover { background: var(--yellow); }
+.pl-ico.del:hover { background: var(--red); color: #fff; }
+.pl-empty { font-size: 11px; opacity: .6; padding: 2px 2px 4px; }
+.pl-addrow { display: flex; gap: 6px; }
+.pl-bottom { display: flex; gap: 8px; }
+.pl-bottom small { font-size: 9.5px; opacity: .7; }
+#pl-ai:disabled { opacity: .5; cursor: wait; }
+#btn-open-pool { margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════ 창 모드 ══════════════════════ -->
+<div id="win">
+  <div id="titlebar">
+    <span>🐾</span>
+    <span id="tb-name"></span>
+    <button class="tb-btn bevel-out" id="btn-shot" title="스크린샷 저장">📷</button>
+    <button class="tb-btn bevel-out" id="btn-copy" title="클립보드에 복사">📋</button>
+    <button class="tb-btn bevel-out" id="btn-set" title="설정">⚙</button>
+    <button class="tb-btn bevel-out" id="btn-pin" title="항상 위에 표시">📌</button>
+    <button class="tb-btn bevel-out" id="btn-min" title="최소화">_</button>
+    <button class="tb-btn bevel-out" id="btn-close" title="종료">✕</button>
+  </div>
+
+  <div id="main">
+    <div id="room" class="bevel-in">
+      <div class="wall"></div>
+      <div class="pane"><div id="sky"></div></div>
+      <div class="shelf"></div><div class="plant">🌵</div>
+      <div class="baseboard"></div>
+      <div class="floor"></div>
+      <div class="rug"></div>
+      <div id="clock"><small id="ampm">AM</small><span id="clk">00:00</span></div>
+      <div id="date-bg"></div>
+      <div id="hg"></div>
+      <div id="banner"></div>
+      <button id="add-char" title="두 번째 캐릭터 추가"><b>＋</b>친구</button>
+      <div id="dim"></div>
+    </div>
+    <div id="stats" class="bevel-in">
+      <div id="st-head"></div>
+      <table>
+        <tr><td>밥</td><td class="v" id="st-hunger"></td></tr>
+        <tr><td>기분</td><td class="v" id="st-happy"></td></tr>
+        <tr><td>체력</td><td class="v" id="st-energy"></td></tr>
+        <tr><td>청결</td><td class="v" id="st-clean"></td></tr>
+        <tr><td>건강</td><td class="v" id="st-health"></td></tr>
+      </table>
+      <div id="st-age"></div>
+      <div id="st-aff"></div>
+    </div>
+  </div>
+
+  <div id="toolbar" class="bevel-out">
+    <button class="tool bevel-out" data-act="feed"     title="밥주기">🍚</button>
+    <button class="tool bevel-out" data-act="play"     title="놀아주기">🎾</button>
+    <button class="tool bevel-out" data-act="sleep"    title="재우기">🌙</button>
+    <button class="tool bevel-out" data-act="clean"    title="씻기기">🛁</button>
+    <button class="tool bevel-out" data-act="medicine" title="약주기">💊</button>
+    <button class="tool bevel-out" data-act="pet"      title="쓰다듬기">✋</button>
+    <button class="tool bevel-out" id="sp-btn"         title="특별 이벤트">💞</button>
+    <span class="sep"></span>
+    <button class="tool bevel-out mode" id="to-free" title="바탕화면을 돌아다니게 하기">자유 모드</button>
+    <div id="sp-pop">
+      <button class="sp-btn" id="sp-gift" data-sp="gift">🎁 선물<small></small></button>
+      <button class="sp-btn" id="sp-kiss" data-sp="kiss">💋 뽀뽀<small></small></button>
+      <button class="sp-btn" id="sp-date" data-sp="date">🌸 데이트<small></small></button>
+    </div>
+  </div>
+
+  <div id="msg" class="bevel-in"></div>
+  <input type="file" id="img-file" accept="image/*" hidden>
+</div>
+
+<!-- ══════════════════════ 자유 모드 ══════════════════════ -->
+<div id="free">
+  <div id="fbanner"></div>
+  <div id="menu">
+    <div id="m-name"></div>
+    <div id="m-sub"></div>
+    <div class="stat"><span>🍎 밥</span><div class="bar"><i id="m-hunger"></i></div></div>
+    <div class="stat"><span>😊 기분</span><div class="bar"><i id="m-happy"></i></div></div>
+    <div class="stat"><span>⚡ 체력</span><div class="bar"><i id="m-energy"></i></div></div>
+    <div class="stat"><span>🛁 청결</span><div class="bar"><i id="m-clean"></i></div></div>
+    <div class="stat"><span>❤️ 건강</span><div class="bar"><i id="m-health"></i></div></div>
+    <div class="m-grid">
+      <button data-act="feed">🍎 밥주기</button>
+      <button data-act="play">🎾 놀아주기</button>
+      <button data-act="sleep">💤 재우기</button>
+      <button data-act="clean">🛁 씻기기</button>
+      <button data-act="medicine">💊 약주기</button>
+      <button data-act="pet">✨ 쓰다듬기</button>
+    </div>
+    <div id="m-special">
+      <div id="m-aff"></div>
+      <div class="m-grid" style="margin-top:0">
+        <button data-sp="gift">🎁 선물<small></small></button>
+        <button data-sp="kiss">💋 뽀뽀<small></small></button>
+        <button data-sp="date">🌸 데이트<small></small></button>
+      </div>
+    </div>
+    <div class="m-foot"><button id="m-window">🏠 창 모드</button><button id="m-set">⚙ 설정</button><button id="m-quit">종료</button></div>
+  </div>
+</div>
+
+<!-- ══════════════════════ 설정 창 (원본 설정 팝업) ══════════════════════ -->
+<div id="settings-page">
+  <div id="set-titlebar"><span>⚙ 설정 — 데스크펫</span><button id="set-close">✕</button></div>
+  <div id="set-tabs">
+    <button class="set-tab active" data-tab="common">공통</button>
+    <button class="set-tab" data-tab="c0">캐릭터1</button>
+    <button class="set-tab" data-tab="c1">캐릭터2</button>
+    <button class="set-tab" data-tab="log">📜 로그</button>
+    <button class="set-tab" data-tab="diary">📔 일기</button>
+    <button class="set-tab" data-tab="achv">🏆 업적</button>
+    <button class="set-tab" data-tab="data">💾 데이터</button>
+  </div>
+  <div class="set-body">
+
+    <div class="tab-panel active" id="panel-common">
+      <div class="set-section">
+        <span class="set-label">📏 창 크기</span>
+        <div class="size-btns">
+          <button class="sz-btn" data-sc="1">소</button>
+          <button class="sz-btn" data-sc="1.25">중</button>
+          <button class="sz-btn" data-sc="1.5">대</button>
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="set-section">
+        <span class="set-label">⏱ 욕구 감소 속도</span>
+        <div class="preset-btns">
+          <button class="ps-btn" data-ps="vslow">🐢<br>매우 느긋</button>
+          <button class="ps-btn" data-ps="slow">🌱<br>느긋하게</button>
+          <button class="ps-btn" data-ps="normal">🌿<br>보통</button>
+          <button class="ps-btn" data-ps="fast">🔥<br>빡빡하게</button>
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="set-section">
+        <span class="set-label">📅 날짜 속도 <small>(앱이 켜져 있는 시간 기준 하루)</small></span>
+        <div class="preset-btns">
+          <button class="ps-btn" data-ds="slow">🐌<br>24시간</button>
+          <button class="ps-btn" data-ds="normal">🌿<br>4시간</button>
+          <button class="ps-btn" data-ds="fast">⚡<br>1시간</button>
+        </div>
+      </div>
+      <hr class="divider">
+      <div class="set-section">
+        <span class="set-label">🔑 Gemini API 키 <small>(무료 · aistudio.google.com)</small></span>
+        <input class="set-input" id="set-apikey" type="password" placeholder="AIza...">
+        <button class="data-btn" id="btn-open-pool" type="button">💬 대사 풀 보기 · 편집</button>
+      </div>
+      <div class="set-section" id="relation-wrap" style="display:none">
+        <span class="set-label">💞 두 캐릭터의 관계 <small>(없으면 호감도 기반 자동 설정)</small></span>
+        <textarea class="set-input" id="set-relation" rows="2" placeholder="예) 소꿉친구. 티격태격하지만 사실 많이 좋아함."></textarea>
+      </div>
+      <hr class="divider">
+      <div class="set-section">
+        <span class="set-label">🔔 알림 <small id="notify-where">(윈도우 알림으로 와요)</small></span>
+        <label class="chk"><input type="checkbox" id="set-notify-on"> 알림 켜기</label>
+        <span class="set-label" style="font-size:10px">알림 기준 수치: <span id="threshold-val">20</span></span>
+        <input type="range" id="set-notify-threshold" min="10" max="40" step="1" value="20">
+        <span class="set-label" style="font-size:10px">알림 최소 간격: <span id="interval-val">10</span>분</span>
+        <input type="range" id="set-notify-interval" min="1" max="60" step="1" value="10">
+        <span class="set-label" style="font-size:10px">알림 받을 스탯</span>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <label class="chk"><input type="checkbox" id="nstat-hunger"> 🍎 밥</label>
+          <label class="chk"><input type="checkbox" id="nstat-happy"> 😊 기분</label>
+          <label class="chk"><input type="checkbox" id="nstat-energy"> ⚡ 체력</label>
+          <label class="chk"><input type="checkbox" id="nstat-clean"> 🛁 청결</label>
+          <label class="chk"><input type="checkbox" id="nstat-health"> ❤️ 건강</label>
+        </div>
+        <div id="notify-perm-warn" class="set-note" style="display:none;color:var(--red)">⚠️ 알림 권한이 거부됐어요.</div>
+      </div>
+      <hr class="divider">
+      <div class="set-section" id="autostart-wrap" style="display:none">
+        <span class="set-label">🚀 시작 프로그램 <small>(누르면 바로 적용돼요)</small></span>
+        <label class="chk"><input type="checkbox" id="set-autostart"> <span id="autostart-label">윈도우를 켤 때 데스크펫도 같이 켜기</span></label>
+      </div>
+      <hr class="divider" id="autostart-div" style="display:none">
+      <div class="set-section">
+        <span class="set-label">💬 대사 지속 시간 <small>(자유 모드 말풍선)</small>: <span id="bubble-dur-val">3초</span></span>
+        <input type="range" id="set-bubble-dur" min="1" max="10" step="1" value="3">
+      </div>
+      <button class="set-save" id="btn-save-common">💾 저장</button>
+    </div>
+
+    <div class="tab-panel" id="panel-c0">
+      <div class="set-section"><span class="set-label">🏷️ 이름</span>
+        <input class="set-input" id="set-name0" type="text" maxlength="8" placeholder="캐릭터1 이름..."></div>
+      <div class="set-section"><span class="set-label">✨ 성격 <small>(AI 대사에 반영)</small></span>
+        <textarea class="set-input" id="set-persona0" rows="3" placeholder="예) 활발하고 먹을 것을 좋아함. 잠이 많음."></textarea></div>
+      <div class="set-section"><span class="set-label">🖼️ 이미지 <small>(펫 창에서 펫을 우클릭해도 돼요)</small></span>
+        <div class="img-upload-box" id="imgbox0"><img class="img-preview" id="setprev0" style="display:none" alt="">
+          <span id="imglbl0">🐾 클릭해서 업로드</span><input type="file" id="setfile0" accept="image/*" hidden></div></div>
+      <button class="set-save" id="btn-save0">💾 저장</button>
+    </div>
+
+    <div class="tab-panel" id="panel-c1">
+      <div class="set-section"><span class="set-label">🏷️ 이름</span>
+        <input class="set-input" id="set-name1" type="text" maxlength="8" placeholder="캐릭터2 이름..."></div>
+      <div class="set-section"><span class="set-label">✨ 성격 <small>(AI 대사에 반영)</small></span>
+        <textarea class="set-input" id="set-persona1" rows="3" placeholder="예) 조용하고 차분함. 독서를 좋아함."></textarea></div>
+      <div class="set-section"><span class="set-label">🖼️ 이미지</span>
+        <div class="img-upload-box" id="imgbox1"><img class="img-preview" id="setprev1" style="display:none" alt="">
+          <span id="imglbl1">🐾 클릭해서 업로드</span><input type="file" id="setfile1" accept="image/*" hidden></div></div>
+      <button class="set-save" id="btn-save1">💾 저장</button>
+    </div>
+
+    <div class="tab-panel" id="panel-log">
+      <div id="log-filter">
+        <button class="log-filter-btn active" data-lf="all">전체</button>
+        <button class="log-filter-btn" data-lf="0">캐릭터1</button>
+        <button class="log-filter-btn" data-lf="1">캐릭터2</button>
+        <button class="log-filter-btn" data-lf="fail">실패</button>
+      </div>
+      <div id="log-list"><div class="log-empty">아직 대사가 없어요</div></div>
+    </div>
+
+    <div class="tab-panel" id="panel-diary"><div id="diary-list"><div class="log-empty">아직 일기가 없어요 📔</div></div></div>
+
+    <div class="tab-panel" id="panel-achv"><div id="achv-count"></div><div id="achv-list"></div></div>
+
+    <div class="tab-panel" id="panel-data">
+      <div class="set-section">
+        <span class="set-label">📦 백업</span>
+        <div class="preset-btns">
+          <button class="data-btn" id="btn-export">⬇ 내보내기</button>
+          <button class="data-btn" id="btn-import">⬆ 가져오기</button>
+        </div>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+        <div class="set-note">스탯·업적·일기·대사 풀·이미지를 파일 하나로 저장하고 불러와요.<br>
+          웹판 데이터 옮기기: 웹판 데스크펫 창에서 F12 → Console에 아래 줄을 붙여넣고 Enter → 복사된 내용을 .json 파일로 저장해서 가져오기.</div>
+        <input class="set-input" readonly onclick="this.select()"
+          value="copy(JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter(k=>k.startsWith('deskpet')).map(k=>[k,localStorage.getItem(k)]))))">
+      </div>
+      <hr class="divider">
+      <div class="set-section">
+        <span class="set-label">🔄 초기화 <small>(이미지는 유지)</small></span>
+        <button class="data-btn danger" id="btn-reset">🗑️ 데이터 초기화</button>
+      </div>
+      <div class="set-note" id="data-msg"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════ 대사 풀 창 ══════════════════════ -->
+<div id="pool-page">
+  <div class="pl-top">
+    <div id="pl-chars"></div>
+    <span id="pl-total"></span>
+  </div>
+  <div class="pl-main">
+    <div id="pl-trigs"></div>
+    <div class="pl-right">
+      <div class="pl-head">
+        <b id="pl-title"></b>
+        <button class="pl-small" id="pl-clear-trig">이 상황 비우기</button>
+      </div>
+      <div id="pl-lines"></div>
+      <div class="pl-addrow">
+        <input class="set-input" id="pl-new" placeholder="직접 대사 추가 (Enter)" maxlength="60">
+        <button class="data-btn" id="pl-add" style="flex:none;width:60px">추가</button>
+      </div>
+    </div>
+  </div>
+  <div class="pl-bottom">
+    <button class="data-btn" id="pl-ai">🤖 AI로 채우기 <small>(상황마다 +3)</small></button>
+    <button class="data-btn danger" id="pl-clear-all" style="flex:none;width:110px">전부 비우기</button>
+  </div>
+  <div class="set-note" id="pl-note">▶ 누르면 펫이 그 대사를 말해봐요. 대사를 고치고 Enter 또는 칸 밖을 누르면 저장돼요. 비워서 저장하면 삭제돼요.</div>
+</div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+// 앱 ↔ 페이지 통로. 윈도우(WebView2)와 맥(WKWebView)을 같은 모양으로 감쌈. 일반 브라우저에선 null
+const bridge = (() => {
+  const wv = window.chrome && window.chrome.webview;
+  if (wv) return { platform: 'win', postMessage: m => wv.postMessage(m), listen: fn => wv.addEventListener('message', e => fn(e.data)) };
+  const wk = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.deskpet;
+  if (wk) {
+    const fns = [];
+    window.__deskpetHost = m => fns.forEach(f => f(m));   // 맥 앱이 evaluateJavaScript로 호출
+    return { platform: 'mac', postMessage: m => wk.postMessage(m), listen: fn => fns.push(fn) };
+  }
+  return null;
+})();
+const IS_MAC = !!bridge && bridge.platform === 'mac';
+const post = m => { if (bridge) bridge.postMessage(m); };
+const params = new URLSearchParams(location.search);
+const MODE = ['free', 'settings', 'pool'].includes(params.get('mode')) ? params.get('mode') : 'window';
+document.body.classList.add('mode-' + MODE);
+if (bridge) document.body.classList.add('app');
+
+// C# → HTML 메시지 라우터
+const hostHandlers = {};
+const onHost = (type, fn) => { hostHandlers[type] = fn; };
+if (bridge) bridge.listen(m => { hostHandlers[m && m.type] && hostHandlers[m.type](m); });
+if (IS_MAC) {
+  document.body.classList.add('mac');
+  // 맥 웹뷰 기본 우클릭 메뉴(새로 고침 등) 숨김 — 설정·대사 풀의 입력칸은 그대로
+  document.addEventListener('contextmenu', e => { if (!e.target.closest('input, textarea')) e.preventDefault(); });
+}
+
+function openPool() {
+  if (bridge) post({ type: 'openPool' });
+  else window.open(location.pathname + '?mode=pool', 'deskpet_pool', 'width=620,height=640');
+}
+function openSettings() {
+  if (bridge) post({ type: 'openSettings' });
+  else window.open(location.pathname + '?mode=settings', 'deskpet_settings', 'width=500,height=740');
+}
+</script>
+<script>
+/* ============================================================================
+   공용: 저장소 (키·구조는 웹판 deskpet.html과 동일 → 백업 호환)
+   ============================================================================ */
+const SAVE_KEY  = 'deskpet_v1';
+const IMG_KEYS  = ['deskpet_img0', 'deskpet_img1'];
+const LOG_KEY   = 'deskpet_log';
+const POOL_KEY  = 'deskpet_pool';
+const DIARY_KEY = 'deskpet_diary';
+const CD_KEY    = 'deskpet_special_cd';
+const PATCH_KEY = 'deskpet_patches';      // 설정 창 → 메인: 변경분 큐 (윈도우판 추가)
+const IMPORT_KEY = 'deskpet_import';      // 설정 창 → 메인: 백업 가져오기/초기화 요청 (윈도우판 추가)
+const IMG_SIGNAL = 'deskpet_img_uploaded';
+const POOL_MAX  = 50;
+
+const jget = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } };
+const jset = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const loadD = () => jget(SAVE_KEY, {});
+const saveD = d => jset(SAVE_KEY, d);
+const loadPool = () => jget(POOL_KEY, {});
+const savePool = p => jset(POOL_KEY, p);
+const loadLog = () => jget(LOG_KEY, []);
+const saveLog = l => jset(LOG_KEY, l.slice(-50));
+const loadDiary = () => jget(DIARY_KEY, []);
+const saveDiary = d => jset(DIARY_KEY, d.slice(-30));
+
+function poolPush(ci, trigger, line) {
+  const p = loadPool();
+  if (!p[ci]) p[ci] = {};
+  if (!p[ci][trigger]) p[ci][trigger] = [];
+  if (!p[ci][trigger].includes(line)) {
+    p[ci][trigger].push(line);
+    if (p[ci][trigger].length > POOL_MAX) p[ci][trigger].shift();
+  }
+  savePool(p);
+}
+function poolPick(ci, trigger) {
+  const arr = loadPool()[ci]?.[trigger];
+  return arr && arr.length ? arr[Math.floor(Math.random() * arr.length)] : null;
+}
+function poolClear(ci) { const p = loadPool(); delete p[ci]; savePool(p); }
+
+const PRESETS = {
+  vslow:  { interval: 80000, hunger: 0.5, happy: 0.4, clean: 0.3 },
+  slow:   { interval: 20000, hunger: 1,   happy: 0.8, clean: 0.5 },
+  normal: { interval: 13000, hunger: 2,   happy: 1.5, clean: 1   },
+  fast:   { interval: 9000,  hunger: 3,   happy: 2,   clean: 1.5 },
+};
+const DAY_SPEEDS = { slow: 86400000, normal: 14400000, fast: 3600000 };
+
+const GROWTH_STAGES = [
+  { id: 'baby',  label: '아기',   emoji: '🥚', minAge: 0,  minCare: 0,   scale: 0.60 },
+  { id: 'child', label: '어린이', emoji: '🌱', minAge: 7,  minCare: 50,  scale: 0.75 },
+  { id: 'teen',  label: '청소년', emoji: '🌿', minAge: 20, minCare: 150, scale: 0.90 },
+  { id: 'adult', label: '어른',   emoji: '🌳', minAge: 40, minCare: 300, scale: 1.00 },
+];
+function getStage(age, care) {
+  let stage = GROWTH_STAGES[0];
+  for (const s of GROWTH_STAGES) if (age >= s.minAge && care >= s.minCare) stage = s;
+  return stage;
+}
+const stageById = id => GROWTH_STAGES.find(s => s.id === id) || GROWTH_STAGES[0];
+
+const AFFINITY_LABELS = [
+  [0,   '😒 서먹서먹',    '서로 어색하고 말이 없음'],
+  [200, '🙂 아는 사이',   '가끔 말 걸지만 아직 서먹함'],
+  [400, '😊 친구',        '편하게 지내는 사이'],
+  [600, '😄 친한 친구',   '서로 잘 챙겨주고 자주 이야기함'],
+  [800, '💕 베스트프렌드', '뭐든 같이하고 싶은 단짝'],
+];
+function getAffinityLabel(v) {
+  let r = AFFINITY_LABELS[0];
+  for (const row of AFFINITY_LABELS) if (v >= row[0]) r = row;
+  return r;
+}
+
+const ACHIEVEMENTS = [
+  { id: 'first_name',   emoji: '🌱', name: '첫 만남',     desc: '캐릭터 이름을 처음 설정했어요' },
+  { id: 'first_image',  emoji: '🖼️', name: '내 모습이야', desc: '캐릭터 이미지를 업로드했어요' },
+  { id: 'first_feed',   emoji: '🍎', name: '첫 밥',       desc: '처음으로 밥을 줬어요' },
+  { id: 'feed_50',      emoji: '🍽️', name: '집밥의 왕',   desc: '밥을 50번 줬어요' },
+  { id: 'first_play',   emoji: '🎾', name: '놀자!',       desc: '처음으로 같이 놀았어요' },
+  { id: 'play_30',      emoji: '🎮', name: '놀이왕',      desc: '놀아주기 30번 달성' },
+  { id: 'first_clean',  emoji: '🛁', name: '첫 목욕',     desc: '처음으로 씻겨줬어요' },
+  { id: 'clean_100',    emoji: '✨', name: '청결왕',      desc: '청결 100을 달성했어요' },
+  { id: 'medicine_10',  emoji: '💊', name: '건강제일',    desc: '약을 10번 줬어요' },
+  { id: 'health_7days', emoji: '❤️', name: '무적',        desc: '건강 100을 7일 유지했어요' },
+  { id: 'day_7',        emoji: '🎂', name: '7일',         desc: '함께한 지 7일이 됐어요' },
+  { id: 'day_30',       emoji: '🎂', name: '30일',        desc: '함께한 지 30일이 됐어요' },
+  { id: 'day_100',      emoji: '🎂', name: '100일',       desc: '함께한 지 100일이 됐어요' },
+  { id: 'grow_child',   emoji: '🌱', name: '첫 성장',     desc: '어린이로 성장했어요' },
+  { id: 'grow_teen',    emoji: '🌿', name: '쑥쑥',        desc: '청소년으로 성장했어요' },
+  { id: 'grow_adult',   emoji: '🌳', name: '다 컸어요',   desc: '어른이 됐어요' },
+  { id: 'two_chars',    emoji: '👫', name: '첫 친구',     desc: '캐릭터를 2마리로 늘렸어요' },
+  { id: 'affinity_80',  emoji: '💕', name: '단짝',        desc: '호감도 800을 달성했어요' },
+  { id: 'affinity_100', emoji: '💯', name: '베프',        desc: '호감도 1000을 달성했어요' },
+  { id: 'night_owl',    emoji: '🌙', name: '올빼미',      desc: '자정~새벽 4시에 접속했어요' },
+];
+
+const TRIGGER_LABELS = {
+  greeting: '첫 인사', feed: '밥 먹음', play: '같이 놀기', pet: '쓰다듬기',
+  clean: '목욕', medicine: '약 먹음', wakeup: '잠에서 깸', idle: '혼잣말',
+  hungry: '배고픔 호소', sleepy: '졸림', sick: '아픔', click: '클릭 반응', interact: '친구에게 말걸기',
+  gift: '선물 주고받기', kiss: '뽀뽀함', date: '데이트 중',
+};
+
+const FALLBACKS = {
+  idle:     ['오늘도 같이 있어줘서 고마워요 😊', '배고프다...', '낮잠 자고 싶어~', '뭐 하고 있어요?', '히히~ 😄', '오늘 날씨 좋다!'],
+  click:    ['안녕! 😊', '왜 눌러요~ 😳', '히히 간지러워요!', '또 눌렀어요?'],
+  hungry:   ['배고파요... 🍎 밥 주세요!', '꼬르륵... 😫', '배고파 죽겠어요 🍎'],
+  sleepy:   ['졸려요... 💤 재워주세요~', '눈이 감겨요 😴', '자고 싶어요... 💤'],
+  sick:     ['몸이 안 좋아요... 💊', '아파요 😢', '약 주세요 💊'],
+  feed:     ['냠냠! 맛있어요 😋', '감사해요 🍎', '배부르다~ 😊'],
+  play:     ['같이 놀아요~ 🎾', '신나요! 😄', '재밌다 히히~'],
+  pet:      ['좋아요~ ✨', '기분 최고! 😊', '더 해줘요~'],
+  clean:    ['깨끗해졌어요! ✨', '상쾌해요 🛁', '감사해요~'],
+  medicine: ['쓴데... 고마워요 💊', '건강해질게요!', '으... 써요 😣'],
+  wakeup:   ['잘 잤어요~ ☀️', '좋은 아침이에요! 😊', '일어났어요~'],
+  greeting: ['안녕하세요~ 😊', '반가워요! 🎉', '오늘도 잘 부탁해요~'],
+  interact: ['같이 있으니 좋아요 💕', '행복해요 ✨', '친구가 있어서 다행이에요~'],
+  gift:     ['선물이에요! 받아줘요 🎁', '고마워요! 기뻐요 🎁', '소중히 할게요 💛'],
+  kiss:     ['💋 ...부끄러워요', '두근두근해요 💕', '...행복해요 💋'],
+  date:     ['데이트 너무 좋아요 🌸', '같이 있고 싶어요 💕', '행복한 시간이에요 ✨'],
+};
+const pickOne = a => a[Math.floor(Math.random() * a.length)];
+
+// 화면에 보이는 스탯. 저장값 sleep(졸음, 높을수록 나쁨)은 '체력'(= 100 - 졸음)으로 뒤집어 보여줌
+// → 다섯 스탯 모두 "낮으면 나쁨"으로 통일. 저장 구조는 웹판과 호환되게 그대로 둠
+const STAT_VIEW = ['hunger', 'happy', 'energy', 'clean', 'health'];
+const statValue = (C, k) => k === 'energy' ? 100 - (C.sleep ?? 0) : (C[k] ?? 100);
+const statBad = v => v < 20;
+
+function defChar(i) { return {
+  name: i === 0 ? '캐릭터1' : '캐릭터2', persona: '',
+  hunger: 80, happy: 80, sleep: 20, clean: 80, health: 100,
+  asleep: false, playedMs: 0, age: 0,
+  care: 0, stageId: 'baby',
+  actionCounts: { feed: 0, play: 0, clean: 0, medicine: 0, pet: 0 },
+  healthStreak: 0,
+}; }
+function defCommon() { return {
+  apiKey: '', relation: '', scale: 1, preset: 'normal', hasChar1: false, affinity: 0,
+  notifyOn: false, notifyThreshold: 20,
+  notifyStats: { hunger: true, happy: false, clean: false, health: true },
+  notifyIntervalMin: 10,
+  daySpeed: 'normal',
+  bubbleDur: 3,
+  achievements: [],
+  lastDiaryDay: [-1, -1],
+}; }
+
+// 설정 창 → 메인으로 변경분 전달 (전체 D를 덮어쓰지 않아서 저장 경합이 없음)
+function sendPatch(patch) {
+  const q = jget(PATCH_KEY, []);
+  q.push(Object.assign({ ts: Date.now() + Math.random() }, patch));
+  jset(PATCH_KEY, q.slice(-20));
+}
+
+// 받침 유무로 조사 고르기: 이/가, 이랑/랑 …
+function josa(word, withB, withoutB) {
+  const c = (word || '').charCodeAt(word.length - 1);
+  if (!(c >= 0xAC00 && c <= 0xD7A3)) return withB + '(' + withoutB + ')';
+  return (c - 0xAC00) % 28 ? withB : withoutB;
+}
+const esc = t => String(t ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ============================================================================
+   Gemini (원본과 동일)
+   ============================================================================ */
+// 모델 목록: 앞에서부터 시도하고, 성공한 모델을 기억해 다음부터 먼저 씀.
+// (2026년 기준 gemini-2.5 계열은 기존 사용자에게만 열려 있어서 새 키로는 안 됨 → 최신 Flash 우선)
+const GEMINI_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+const MODEL_KEY = 'deskpet_model';
+
+async function geminiCall(apiKey, prompt) {
+  const saved = localStorage.getItem(MODEL_KEY);
+  const order = saved && GEMINI_MODELS.includes(saved) ? [saved, ...GEMINI_MODELS.filter(m => m !== saved)] : GEMINI_MODELS;
+  let lastErr = null;
+  for (const model of order) {
+    // 키는 URL(?key=)이 아니라 헤더로 보냄 — 새로 발급되는 인증 키(auth key) 방식
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    });
+    if (res.ok) {
+      localStorage.setItem(MODEL_KEY, model);
+      const data = await res.json();
+      // 생각(thought) 파트는 빼고 본문 텍스트만 이어붙임
+      return (data?.candidates?.[0]?.content?.parts || []).filter(p => !p.thought).map(p => p.text || '').join('').trim();
+    }
+    const body = await res.text().catch(() => '');
+    lastErr = new Error(`HTTP ${res.status} (${model}): ${body.slice(0, 120)}`);
+    // 이 모델을 못 쓰는 경우만 다음 모델로. 키 오류·한도 초과(429) 등은 바로 중단
+    const modelProblem = res.status === 404 || ((res.status === 400 || res.status === 403) && /model|not found|not supported|access/i.test(body));
+    if (!modelProblem) throw lastErr;
+    if (saved === model) localStorage.removeItem(MODEL_KEY);
+  }
+  throw lastErr;
+}
+
+async function geminiAllTriggers({ apiKey, me, other, relation }) {
+  const mood = me.asleep ? '잠자는 중' : me.hunger < 25 ? '매우 배고픔' : me.happy < 25 ? '슬프고 외로움' : me.health < 30 ? '몸이 아픔' : me.sleep > 80 ? '매우 졸림' : me.happy > 80 ? '아주 행복함' : me.clean < 25 ? '더럽고 불쾌함' : '평온함';
+  const interactCtx = other
+    ? `\n\n"interact" 트리거 한정: 같이 있는 친구 "${other.name}"에게 말을 거는 상황.${relation ? ` 둘의 관계: ${relation}` : ''}`
+    : '';
+  const prompt =
+`너는 "${me.name}"이라는 이름의 귀여운 가상 캐릭터야.
+성격: ${me.persona || '귀엽고 활발함'}
+현재 상태: ${mood} (나이 ${me.age}일)${interactCtx}
+
+아래 각 상황에 맞는 짧은 한국어 대사를 서로 다른 느낌으로 3개씩 만들어줘.
+조건: 각 대사는 이모지 1~2개 포함, 20자 이내, 성격에 맞게.
+주의: interact를 제외한 나머지 트리거 대사에는 다른 캐릭터 이름을 절대 넣지 마. 혼잣말 느낌으로.
+
+반드시 아래 JSON 형식으로만 출력해. 각 트리거는 문자열 배열 3개. 다른 텍스트 없이 JSON만:
+{"greeting":["...","...","..."], "feed":["...","...","..."], "play":["...","...","..."], "pet":["...","...","..."], "clean":["...","...","..."], "medicine":["...","...","..."], "wakeup":["...","...","..."], "idle":["...","...","..."], "hungry":["...","...","..."], "sleepy":["...","...","..."], "sick":["...","...","..."], "click":["...","...","..."], "interact":["...","...","..."], "gift":["...","...","..."], "kiss":["...","...","..."], "date":["...","...","..."]}`;
+
+  const text = await geminiCall(apiKey, prompt);
+  if (!text) throw new Error('응답 파싱 실패');
+  const clean = text.replace(/^```json\s*/, '').replace(/^```\s*/, '').replace(/```\s*$/, '').trim();
+  try {
+    const obj = JSON.parse(clean);
+    if (typeof obj !== 'object' || Array.isArray(obj)) throw new Error('JSON 형식 오류');
+    return obj;
+  } catch { throw new Error(`JSON 파싱 실패: ${clean.slice(0, 100)}`); }
+}
+
+async function geminiDiary({ apiKey, me, other, day, summary, mood }) {
+  const otherTxt = other ? `같이 있는 친구: "${other.name}". ` : '';
+  const prompt =
+`너는 "${me.name}"이라는 이름의 귀여운 가상 캐릭터야.
+성격: ${me.persona || '귀엽고 활발함'}
+${otherTxt}
+오늘(${day}일째) 있었던 일: ${summary}. 전반적으로 ${mood}한 하루였어.
+
+오늘 하루를 캐릭터 시점으로 짧은 일기로 써줘.
+3~4문장, 한국어, 이모지 포함, 귀엽고 자연스럽게. 날짜나 제목 없이 본문만.`;
+  return (await geminiCall(apiKey, prompt)) || null;
+}
+
+/* ============================================================================
+   엔진: 원본 runMain()의 게임 로직을 화면 코드에서 분리한 것.
+   화면(창 모드/자유 모드)은 이벤트를 구독해서 각자 방식으로 연출한다.
+
+   이벤트: say(ci,text) · heart(ci) · bounce(ci) · pop(emoji) · anim(ci,name)
+           banner(html,ms) · confetti() · grow(ci) · closer(kind,ms) · date(theme|null)
+           change() · chars() · images() · scale(v)
+   ============================================================================ */
+function createEngine() {
+  let D = loadD();
+  if (!D.chars) D.chars = [defChar(0)];
+  if (!D.common) D.common = defCommon();
+  D.chars.forEach((c, i) => { if (!c) return; const d = defChar(i); for (const k in d) if (c[k] === undefined) c[k] = d[k]; });
+  D.chars.forEach(c => {
+    if (!c) return;
+    if (c.born && !c.playedMs) { c.playedMs = Date.now() - c.born; delete c.born; }
+    if (!c.stageId) c.stageId = 'baby';
+  });
+  { const d = defCommon(); for (const k in d) if (D.common[k] === undefined) D.common[k] = d[k]; }
+
+  let charCount = D.common.hasChar1 && D.chars[1] ? 2 : 1;
+  let skipSave = false;
+  const save = () => { if (!skipSave) saveD(D); };
+
+  const L = {};
+  const on = (k, f) => (L[k] || (L[k] = [])).push(f);
+  const emit = (k, ...a) => (L[k] || []).forEach(f => { try { f(...a); } catch (e) { console.error(e); } });
+
+  // ---------- 말하기: 풀 → 없으면 기본 대사, 뒤에서 풀 보충 ----------
+  const say = (ci, text) => emit('say', ci, text);
+  // 배너는 겹치지 않게 순서대로 (업적 여러 개가 동시에 떠도 다 보이게)
+  const bannerQ = []; let bannerBusy = false;
+  function banner(html, ms) { bannerQ.push([html, ms]); if (!bannerBusy) nextBanner(); }
+  function nextBanner() {
+    const b = bannerQ.shift();
+    if (!b) { bannerBusy = false; return; }
+    bannerBusy = true; emit('banner', b[0], b[1]);
+    setTimeout(nextBanner, b[1] + 300);
+  }
+  function aiSpeak(ci, trigger) {
+    say(ci, poolPick(ci, trigger) || pickOne(FALLBACKS[trigger] || FALLBACKS.idle));
+    checkAndRefill(ci, trigger);
+  }
+  const pushLog = e => { const l = loadLog(); l.push(e); saveLog(l); };
+
+  const BATCH_LOG = [];
+  let batchRunning = false, blockedUntil = 0;
+  const lastRefillTime = [0, 0];
+  const getPoolTotal = ci => Object.values(loadPool()[ci] || {}).reduce((s, a) => s + (Array.isArray(a) ? a.length : 0), 0);
+  function canBatch(ci, force) {
+    if (Date.now() < blockedUntil || batchRunning) return false;
+    if (!force && Date.now() - lastRefillTime[ci] < 10 * 60 * 1000) return false;
+    const cutoff = Date.now() - 60000;
+    while (BATCH_LOG.length && BATCH_LOG[0] < cutoff) BATCH_LOG.shift();
+    return BATCH_LOG.length < 2;
+  }
+  async function refillPool(ci, force = false) {
+    if (!D.common.apiKey || !canBatch(ci, force)) return;
+    batchRunning = true; BATCH_LOG.push(Date.now()); lastRefillTime[ci] = Date.now();
+    try {
+      const other = charCount === 2 ? D.chars[1 - ci] : null;
+      const rel = D.common.relation || (charCount === 2 ? getAffinityLabel(D.common.affinity)[2] : '');
+      const result = await geminiAllTriggers({ apiKey: D.common.apiKey, me: D.chars[ci], other, relation: rel });
+      let saved = 0;
+      for (const [trigger, value] of Object.entries(result))
+        for (const line of (Array.isArray(value) ? value : [value]))
+          if (typeof line === 'string' && line.trim()) { poolPush(ci, trigger, line.trim()); saved++; }
+      pushLog({ ci, trigger: '[전체]', time: Date.now(), line: `[트리거 ${saved}개 저장됨]`, fail: null });
+    } catch (err) {
+      const msg = err.message || '오류';
+      if (msg.includes('429') || msg.includes('503')) blockedUntil = Date.now() + 120000;
+      pushLog({ ci, trigger: '[전체]', time: Date.now(), line: null, fail: `배치: ${msg}` });
+    } finally { batchRunning = false; }
+  }
+  function checkAndRefill(ci, trigger) {
+    if (!D.common.apiKey) return;
+    if ((loadPool()[ci]?.[trigger]?.length || 0) <= 10) refillPool(ci);
+  }
+
+  // ---------- 알림 (윈도우: 트레이 풍선 / 브라우저: Notification) ----------
+  let hostHidden = false;   // C#이 최소화 상태를 알려줌
+  function notify(title, body) {
+    if (bridge) return post({ type: 'notify', title, body });
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body });
+  }
+
+  // ---------- 업적 ----------
+  const unlocked = new Set(D.common.achievements || []);
+  function unlock(id) {
+    if (unlocked.has(id)) return;
+    unlocked.add(id);
+    if (!D.common.achievements.includes(id)) {
+      D.common.achievements.push(id);
+      const a = ACHIEVEMENTS.find(x => x.id === id);
+      if (a) {
+        banner(`🏆 업적 달성!<br>${a.emoji} ${esc(a.name)}`, 3000);
+        emit('confetti');
+        if (D.common.notifyOn) notify('🏆 업적 달성!', `${a.emoji} ${a.name} — ${a.desc}`);
+      }
+      save();
+    }
+  }
+
+  // ---------- 나이 / 성장 ----------
+  const dayMs = () => DAY_SPEEDS[D.common.daySpeed || 'normal'];
+  const calcAge = ci => { const C = D.chars[ci]; return C ? (C.ageOffset || 0) + Math.floor((C.playedMs || 0) / dayMs()) : 0; };
+  function checkGrowth(ci) {
+    const C = D.chars[ci]; if (!C) return;
+    const st = getStage(C.age || 0, C.care || 0);
+    if (st.id === C.stageId) return;
+    C.stageId = st.id;
+    emit('grow', ci);
+    banner(`${st.emoji} ${esc(C.name)}${josa(C.name, '이', '가')} ${st.label}${josa(st.label, '으로', '로')} 성장했어요!`, 3500);
+    emit('confetti');
+    aiSpeak(ci, 'idle');
+    const m = { child: 'grow_child', teen: 'grow_teen', adult: 'grow_adult' };
+    if (m[st.id]) unlock(m[st.id]);
+    save();
+  }
+
+  // ---------- 캐릭터 2 ----------
+  function enableChar1(silent = false) {
+    if (charCount >= 2) return;
+    charCount = 2; D.common.hasChar1 = true;
+    if (!D.chars[1]) D.chars[1] = defChar(1);
+    emit('chars');
+    unlock('two_chars');
+    if (!silent) { save(); setTimeout(() => refillPool(1, true), 1000); }
+    emit('change');
+  }
+
+  // ---------- 특별 이벤트 (선물/뽀뽀/데이트) ----------
+  const SPECIAL_NEEDS = { gift: 400, kiss: 600, date: 800 };
+  const specialCdUntil = Object.assign({ gift: 0, kiss: 0, date: 0 }, jget(CD_KEY, {}));
+  const saveCd = () => jset(CD_KEY, specialCdUntil);
+  const DATE_THEMES = [
+    { sky: 'linear-gradient(180deg,#42a5f5 0%,#90caf9 55%,#e3f2fd 100%)', ground: 'linear-gradient(180deg,#a5d6a7 0%,#66bb6a 100%)', name: '봄 소풍 🌸' },
+    { sky: 'linear-gradient(180deg,#7e57c2 0%,#ef6c00 45%,#ffb74d 100%)', ground: 'linear-gradient(180deg,#bf8040 0%,#8d5524 100%)', name: '노을 데이트 🌇' },
+    { sky: 'linear-gradient(180deg,#0d0d1a 0%,#0d1b3e 60%,#1a237e 100%)', ground: 'linear-gradient(180deg,#e8eaf6 0%,#c5cae9 100%)', name: '별 보러 가기 🌙' },
+  ];
+  let dateTimer = null;
+  function specialState(key) {
+    if (charCount < 2) return { locked: true, need: SPECIAL_NEEDS[key] };
+    if (D.common.affinity < SPECIAL_NEEDS[key]) return { locked: true, need: SPECIAL_NEEDS[key] };
+    const now = Date.now();
+    if (now < specialCdUntil[key]) return { cooldownMin: Math.ceil((specialCdUntil[key] - now) / 60000) };
+    return {};
+  }
+  const addAff = d => { D.common.affinity = Math.max(0, Math.min(1000, D.common.affinity + d)); };
+  const addHappy = (ci, d) => { D.chars[ci].happy = Math.min(100, D.chars[ci].happy + d); };
+  function special(key) {
+    const st = specialState(key);
+    if (st.locked || st.cooldownMin) return;
+    if (dateTimer) return say(0, '이미 데이트 중이에요 🌸');
+    const [n0, n1] = [D.chars[0].name, D.chars[1].name];
+    if (key === 'gift') {
+      specialCdUntil.gift = Date.now() + 30 * 60 * 1000; saveCd();
+      addAff(30); addHappy(0, 15); addHappy(1, 15);
+      emit('closer', 'gift', 2500);
+      emit('pop', '🎁'); emit('heart', 0); emit('heart', 1); emit('heart', 0);
+      aiSpeak(0, 'gift'); setTimeout(() => aiSpeak(1, 'gift'), 2000);
+    } else if (key === 'kiss') {
+      specialCdUntil.kiss = Date.now() + 10 * 60 * 1000; saveCd();
+      addAff(50); addHappy(0, 20); addHappy(1, 20);
+      emit('closer', 'kiss', 3200);
+      setTimeout(() => { emit('pop', '💋'); [0, 0, 1, 1, 0].forEach(i => emit('heart', i)); emit('confetti'); }, 650);
+      aiSpeak(0, 'kiss'); setTimeout(() => aiSpeak(1, 'kiss'), 2200);
+    } else if (key === 'date') {
+      specialCdUntil.date = Date.now() + 30 * 60 * 1000; saveCd();
+      addAff(80);
+      const theme = pickOne(DATE_THEMES);
+      emit('date', theme);
+      banner(`🌸 ${theme.name} 중...`, 10000);
+      emit('closer', 'date', 10000);
+      [0, 1, 0, 1].forEach(i => emit('heart', i));
+      aiSpeak(0, 'date'); setTimeout(() => aiSpeak(1, 'date'), 2400);
+      dateTimer = setTimeout(() => { dateTimer = null; emit('date', null); emit('change'); }, 10000);
+    }
+    save(); emit('change');
+  }
+
+  // 둘이 5초 안에 같은 돌봄을 받으면 보너스
+  const lastAction = [null, null];
+  function recordAction(ci, act) {
+    lastAction[ci] = { act, time: Date.now() };
+    const o = lastAction[1 - ci];
+    if (o && o.act === act && Date.now() - o.time <= 5000) { addAff(2); emit('pop', '✨'); save(); }
+  }
+
+  // ---------- 돌보기 (수치는 원본 그대로) ----------
+  function act(ci, a) {
+    const C = D.chars[ci]; if (!C || dateTimer) return;
+    if (!C.actionCounts) C.actionCounts = { feed: 0, play: 0, clean: 0, medicine: 0, pet: 0 };
+    if (!C.care) C.care = 0;
+    if (C.asleep && a !== 'sleep') return say(ci, '지금 자고 있어요... 💤');
+    const two = charCount === 2;
+    if (a === 'feed') {
+      if (C.hunger >= 98) return say(ci, '배불러요! 🍎');
+      C.hunger = Math.min(100, C.hunger + 25); C.happy = Math.min(100, C.happy + 3);
+      C.care += 3; C.actionCounts.feed++;
+      emit('heart', ci); emit('bounce', ci); emit('anim', ci, 'eat'); aiSpeak(ci, 'feed');
+      if (two) { addAff(1); recordAction(ci, 'feed'); }
+      if (C.actionCounts.feed === 1) unlock('first_feed');
+      if (C.actionCounts.feed >= 50) unlock('feed_50');
+    } else if (a === 'play') {
+      if (C.sleep >= 78) return say(ci, '졸려서 못 놀아요 😴');
+      C.happy = Math.min(100, C.happy + 20); C.hunger = Math.max(0, C.hunger - 6); C.sleep = Math.min(100, C.sleep + 8);
+      C.care += 4; C.actionCounts.play++;
+      emit('heart', ci); emit('heart', ci); emit('bounce', ci); emit('anim', ci, 'play'); aiSpeak(ci, 'play');
+      if (two) { addAff(1); recordAction(ci, 'play'); }
+      if (C.actionCounts.play === 1) unlock('first_play');
+      if (C.actionCounts.play >= 30) unlock('play_30');
+    } else if (a === 'sleep') {
+      C.asleep = !C.asleep;
+      if (C.asleep) say(ci, 'Zzz... 💤');
+      else { emit('bounce', ci); aiSpeak(ci, 'wakeup'); }
+    } else if (a === 'clean') {
+      C.clean = Math.min(100, C.clean + 35); C.happy = Math.min(100, C.happy + 5);
+      C.care += 3; C.actionCounts.clean++;
+      emit('heart', ci); emit('bounce', ci); emit('anim', ci, 'bath'); aiSpeak(ci, 'clean');
+      if (two) recordAction(ci, 'clean');
+      if (C.actionCounts.clean === 1) unlock('first_clean');
+      if (C.clean >= 100) unlock('clean_100');
+    } else if (a === 'medicine') {
+      if (C.health >= 85) return say(ci, '지금은 건강해요! 😊');
+      C.health = Math.min(100, C.health + 30); C.actionCounts.medicine++;
+      emit('anim', ci, 'med'); aiSpeak(ci, 'medicine');
+      if (C.actionCounts.medicine >= 10) unlock('medicine_10');
+    } else if (a === 'pet') {
+      C.happy = Math.min(100, C.happy + 15);
+      C.care += 2; C.actionCounts.pet++;
+      emit('heart', ci); emit('heart', ci); emit('heart', ci); emit('bounce', ci); emit('anim', ci, 'pat'); aiSpeak(ci, 'pet');
+      if (two) { addAff(0.5); recordAction(ci, 'pet'); }
+    }
+    checkGrowth(ci);
+    save(); emit('change');
+  }
+
+  // 펫 클릭 (원본: 튀어오르기 + 하트 + 클릭 대사)
+  function click(ci) {
+    emit('bounce', ci);
+    if (!D.chars[ci]?.asleep) { emit('heart', ci); aiSpeak(ci, 'click'); }
+  }
+
+  // ---------- 시간 경과 (원본 statTick) ----------
+  function statTick() {
+    const preset = PRESETS[D.common.preset] || PRESETS.normal;
+    for (let ci = 0; ci < charCount; ci++) {
+      const C = D.chars[ci]; if (!C) continue;
+      if (C.asleep) {
+        C.sleep = Math.max(0, C.sleep - 15); C.hunger = Math.max(0, C.hunger - preset.hunger * .3);
+        if (C.sleep <= 0) { C.asleep = false; emit('bounce', ci); aiSpeak(ci, 'wakeup'); }
+      } else {
+        C.hunger = Math.max(0, C.hunger - preset.hunger);
+        C.happy  = Math.max(0, C.happy - preset.happy);
+        C.sleep  = Math.min(100, C.sleep + preset.happy);
+        C.clean  = Math.max(0, C.clean - preset.clean);
+      }
+      const neglect = (C.hunger < 20) + (C.happy < 20) + (C.clean < 20);
+      if (neglect > 0) C.health = Math.max(0, C.health - neglect * 1.5);
+      else if (C.hunger > 60 && C.happy > 60 && C.clean > 60) C.health = Math.min(100, C.health + 0.5);
+
+      if      (C.hunger < 20 && !C.asleep) aiSpeak(ci, 'hungry');
+      else if (C.sleep > 88 && !C.asleep)  aiSpeak(ci, 'sleepy');
+      else if (C.happy < 20 && !C.asleep)  say(ci, '심심해요 😢');
+      else if (C.clean < 20 && !C.asleep)  say(ci, '씻고 싶어요... 🛁');
+      else if (C.health < 25)              aiSpeak(ci, 'sick');
+
+      C.age = calcAge(ci);
+      if (C.health >= 100) {
+        if ((C.healthStreakDay ?? -1) !== C.age) {
+          C.healthStreakDay = C.age;
+          C.healthStreak = (C.healthStreak || 0) + 1;
+          if (C.healthStreak >= 7) unlock('health_7days');
+        }
+      } else { C.healthStreak = 0; C.healthStreakDay = -1; }
+      if (C.age >= 7) unlock('day_7');
+      if (C.age >= 30) unlock('day_30');
+      if (C.age >= 100) unlock('day_100');
+      checkGrowth(ci);
+    }
+    if (charCount === 2) {
+      const [c0, c1] = D.chars;
+      let delta = -0.3;
+      if (c0.hunger < 20 || c1.hunger < 20) delta -= 2;
+      if (c0.happy < 20 || c1.happy < 20) delta -= 2;
+      if (c0.clean < 20 || c1.clean < 20) delta -= 1;
+      if (c0.health < 30 || c1.health < 30) delta -= 3;
+      if (c0.asleep || c1.asleep) delta -= 0.5;
+      if (c0.happy >= 80 && c1.happy >= 80) delta += 0.1;
+      if (c0.clean >= 80 && c1.clean >= 80) delta += 0.05;
+      addAff(delta);
+      if (D.common.affinity >= 800) unlock('affinity_80');
+      if (D.common.affinity >= 1000) unlock('affinity_100');
+    }
+    save(); emit('change');
+  }
+
+  // 경과 시간 누적 방식: 최소화 등으로 타이머가 늦게 와도 실제 시간만큼 틱을 처리
+  let speed = 1, acc = 0, last = Date.now(), lastSave = Date.now();
+  setInterval(() => {
+    const now = Date.now();
+    const dt = Math.min(now - last, 5 * 60e3) * speed;   // PC 절전 복귀 시 폭주 방지
+    last = now;
+    for (let ci = 0; ci < charCount; ci++) D.chars[ci].playedMs = (D.chars[ci].playedMs || 0) + dt;
+    acc += dt;
+    const iv = (PRESETS[D.common.preset] || PRESETS.normal).interval;
+    let n = 0;
+    while (acc >= iv && n++ < 30) { acc -= iv; statTick(); }
+    if (acc >= iv) acc = 0;
+    if (now - lastSave > 10000) { lastSave = now; save(); }
+  }, 1000);
+  addEventListener('beforeunload', save);
+
+  // ---------- 둘 사이 상호작용 ----------
+  // 원본 tryInteract의 호감도 단계·수치는 유지하고, 연출은 뷰의 듀오 안무(runDuo)로 보여줌
+  const tier = () => { const a = D.common.affinity; return a <= 200 ? 0 : a <= 400 ? 1 : a <= 600 ? 2 : a <= 800 ? 3 : 4; };
+  const both = () => charCount === 2 && !dateTimer;
+  let iaCd = false, walkCd = 0, userCd = 0;
+  const cool = ms => { iaCd = true; setTimeout(() => (iaCd = false), ms); };
+  const duo = (kind, a, b) => emit('duo', kind, a, b);
+  const rndPair = () => { const a = Math.random() < .5 ? 0 : 1; return [a, 1 - a]; };
+
+  function tryInteract() {
+    if (!both() || iaCd) return;
+    const [C0, C1] = D.chars;
+    const aff = D.common.affinity, t = tier();
+    // 한쪽만 자고 있을 때: 친하면 옆에서 지켜줌 (윈도우판 추가)
+    if (C0.asleep !== C1.asleep) {
+      if (t >= 3 && Math.random() < .5) {
+        const w = C0.asleep ? 1 : 0;
+        cool(30000); duo('guard', w, 1 - w);
+        say(w, pickOne(['쉿... 자고 있어 🤫', '푹 자~ 💤', '깨우면 안 되지...']));
+      }
+      return;
+    }
+    if (C0.asleep) return;
+    if (C0.health < 30) { cool(20000); emit('pop', '💊'); return aiSpeak(1, 'interact'); }
+    if (C1.health < 30) { cool(20000); emit('pop', '💊'); return aiSpeak(0, 'interact'); }
+    const [a, b] = rndPair();
+    if (aff <= 200) {
+      cool(25000);
+      if (Math.random() < .4) duo('flinch', a, b);
+      say(0, pickOne(['...', '으...어색해', '흠...']));
+      setTimeout(() => say(1, pickOne(['...', '뭐야...', '어색하다'])), 1200);
+    } else if (aff <= 400) {
+      cool(25000); duo('peek', a, b);
+    } else if (aff <= 600) {
+      cool(25000); addAff(1.5);
+      duo(Math.random() < .5 ? 'highfive' : 'chase', a, b);
+      aiSpeak(0, 'interact'); setTimeout(() => aiSpeak(1, 'interact'), 2600);
+    } else if (aff <= 800) {
+      cool(20000); addAff(2);
+      duo(pickOne(['hug', 'hug', 'highfive', 'chase']), a, b);
+      aiSpeak(0, 'interact'); setTimeout(() => aiSpeak(1, 'interact'), 2400);
+    } else {
+      cool(15000); addAff(2);
+      duo(pickOne(['dance', 'dance', 'hug', 'chase']), a, b);
+      setTimeout(() => emit('confetti'), 2600);
+      aiSpeak(0, 'interact'); setTimeout(() => aiSpeak(1, 'interact'), 2200);
+    }
+    save(); emit('change');
+  }
+
+  // 사용자가 붙여놓거나(drop) 위에 떨어뜨리거나(bump) 걷다가 마주쳤을 때(walk) — 뷰가 호출
+  function meet(actor, how) {
+    if (!both()) return false;
+    const now = Date.now();
+    // 사용자가 직접 붙인 건(drop/bump) 거의 바로 반응, 저절로 마주친 건(walk) 가끔만
+    if (how === 'walk' ? now < walkCd : now < userCd) return false;
+    const target = 1 - actor, A = D.chars[actor], T = D.chars[target], t = tier();
+    if (A.asleep) return false;
+    walkCd = now + 25000;
+    userCd = now + (how === 'bump' ? 1500 : 2500);
+
+    if (how === 'bump') {
+      if (T.asleep && t >= 3) {                           // 친하면 뒤척이고 계속 잠
+        duo('nuzzle-sleep', actor, target);
+        say(target, pickOne(['음냐... 💤', '으음... 조금만 더...', '...쿨쿨']));
+        addAff(.5);
+      } else if (T.asleep) {                              // 안 친하면 깨서 투덜
+        T.asleep = false; T.happy = Math.max(0, T.happy - 3);
+        duo('bump', actor, target);
+        say(target, pickOne(['으악! 왜 깨워 💢', '깜짝이야...!', '자고 있었잖아 😠']));
+        addAff(-1);
+      } else {
+        duo('bump', actor, target);
+        if (t <= 1) { say(target, pickOne(['아야! 💢', '뭐야...!', '조심해!'])); addAff(-1); }
+        else { say(target, pickOne(['히히 부딪혔다 😆', '앗 깜짝이야~', '장난치지 마~ 😝'])); addAff(.5); }
+      }
+      save(); emit('change'); return true;
+    }
+    if (T.asleep) {
+      if (t >= 3) { duo('guard', actor, target); say(actor, pickOne(['쉿... 자고 있어 🤫', '푹 자~ 💤'])); }
+      else say(actor, pickOne(['...자네', '흠, 자고 있잖아']));
+      return true;
+    }
+    const kind = pickOne([['flinch'], ['peek'], ['highfive', 'chase'], ['hug', 'highfive', 'chase'], ['dance', 'hug', 'chase']][t]);
+    duo(kind, actor, target);
+    if (t === 0) say(target, pickOne(['...', '으...어색해', '저리 가...']));
+    else if (t === 1) { say(actor, pickOne(['...안녕?', '어, 왔어?', '뭐 해?'])); addAff(.5); }
+    else { aiSpeak(actor, 'interact'); setTimeout(() => aiSpeak(target, 'interact'), 1400); addAff(t >= 3 ? 1.5 : 1); }
+    if (kind === 'dance') setTimeout(() => emit('confetti'), 2600);
+    save(); emit('change'); return true;
+  }
+  setInterval(tryInteract, 15000);
+
+  // 혼잣말 (원본: 약 1분 / 1분 10초 간격)
+  [60000, 70000].forEach((ms, ci) => setInterval(() => {
+    if (ci < charCount && !D.chars[ci].asleep && !dateTimer) aiSpeak(ci, 'idle');
+  }, ms));
+
+  // ---------- AI 일기 (원본과 동일) ----------
+  const diaryRetryAt = [-1, -1], diaryWriting = [false, false];
+  async function tryGenerateDiary(ci) {
+    const C = D.chars[ci]; const today = C.age || 0;
+    if (today <= 0) return;
+    if (!D.common.lastDiaryDay) D.common.lastDiaryDay = [-1, -1];
+    if (D.common.lastDiaryDay[ci] === today || diaryWriting[ci]) return;
+    if (diaryRetryAt[ci] > 0 && Date.now() < diaryRetryAt[ci]) return;
+    diaryWriting[ci] = true;
+    const ac = C.actionCounts || {};
+    const summary = `밥 ${ac.feed || 0}회, 놀기 ${ac.play || 0}회, 목욕 ${ac.clean || 0}회, 쓰다듬기 ${ac.pet || 0}회`;
+    const moodStr = C.happy > 70 ? '행복한' : C.hunger < 30 ? '배고팠던' : C.health < 50 ? '몸이 안 좋았던' : '평온한';
+    let text = '';
+    if (D.common.apiKey) {
+      try {
+        text = await geminiDiary({ apiKey: D.common.apiKey, me: C, other: charCount === 2 ? D.chars[1 - ci] : null, day: today, summary, mood: moodStr }) || '';
+        pushLog({ ci, trigger: '[일기]', time: Date.now(), line: text || '(생성 실패)', fail: text ? null : '응답 없음' });
+        diaryRetryAt[ci] = -1;
+      } catch (e) {
+        const msg = e.message || '';
+        pushLog({ ci, trigger: '[일기]', time: Date.now(), line: null, fail: msg });
+        if (msg.includes('503') || msg.includes('429')) { diaryRetryAt[ci] = Date.now() + 3 * 60 * 1000; diaryWriting[ci] = false; return; }
+      }
+    }
+    if (!text) text = `오늘은 ${moodStr} 하루였어요. ${ac.feed > 0 ? `밥을 ${ac.feed}번 먹었어요 🍎 ` : ''}${ac.play > 0 ? `${ac.play}번이나 같이 놀았어요 🎾 ` : ''}내일도 좋은 하루가 되길 바라요 😊`;
+    D.common.lastDiaryDay[ci] = today;
+    const diary = loadDiary();
+    diary.push({ ci, day: today, date: new Date().toLocaleDateString('ko-KR'), text });
+    saveDiary(diary);
+    C.actionCounts = { feed: 0, play: 0, clean: 0, medicine: 0, pet: 0 };
+    save(); diaryWriting[ci] = false;
+  }
+  setInterval(() => { for (let ci = 0; ci < charCount; ci++) tryGenerateDiary(ci); }, 60000);
+
+  // ---------- 알림 (원본 checkAndNotify) ----------
+  const STAT_LABELS = { hunger: '🍎 밥', happy: '😊 기분', energy: '⚡ 체력', clean: '🛁 청결', health: '❤️ 건강' };
+  const lastNotifyTime = {};
+  function checkAndNotify() {
+    const nc = D.common;
+    if (!nc.notifyOn) return;
+    // 윈도우판: 창이 보이든 최소화돼 있든 트레이 알림을 보냄 (최소 간격 설정으로 너무 잦지 않게)
+    if (!bridge && !document.hidden) return;        // 일반 브라우저에서는 원본처럼 탭이 숨겨졌을 때만
+    const now = Date.now(), gap = (nc.notifyIntervalMin || 10) * 60000, th = nc.notifyThreshold || 20;
+    const stats = nc.notifyStats || { hunger: true, health: true };
+    for (let ci = 0; ci < charCount; ci++) {
+      const C = D.chars[ci]; if (!C || C.asleep) continue;
+      if (now - (lastNotifyTime[ci] || 0) < gap) continue;
+      const low = Object.entries(stats).filter(([k, on]) => on && statValue(C, k) < th).map(([k]) => STAT_LABELS[k]);
+      if (!low.length) continue;
+      lastNotifyTime[ci] = now;
+      notify('🐾 데스크펫', `${C.name}${josa(C.name, '이', '가')} 돌봄이 필요해요! (${low.join(', ')})`);
+    }
+  }
+  setInterval(checkAndNotify, 60000);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) checkAndNotify(); });
+
+  // ---------- 설정 창과 동기화 ----------
+  let lastPatchTs = Math.max(0, ...jget(PATCH_KEY, []).map(p => p.ts));   // 시작 전 쌓인 건 이미 반영된 것
+  let lastImgTs = parseInt(localStorage.getItem(IMG_SIGNAL) || '0');
+  let lastSayTs = jget('deskpet_say', {}).ts || 0;
+  function applyPatch(p) {
+    if (p.common) {
+      const nc = p.common;
+      if (nc.daySpeed && nc.daySpeed !== D.common.daySpeed) {
+        // 날짜 속도가 바뀌면 지금까지의 나이를 ageOffset에 고정하고 playedMs 리셋 (원본과 동일)
+        const oldDay = dayMs();
+        D.chars.forEach(c => { if (!c) return; c.ageOffset = (c.ageOffset || 0) + Math.floor((c.playedMs || 0) / oldDay); c.playedMs = 0; });
+      }
+      const oldScale = D.common.scale;
+      Object.assign(D.common, nc);
+      if (nc.scale !== undefined && nc.scale !== oldScale) emit('scale', nc.scale);
+    }
+    if (p.chars) for (const [i, v] of Object.entries(p.chars)) {
+      const ci = +i;
+      if (!D.chars[ci]) D.chars[ci] = defChar(ci);
+      if (v.persona !== undefined && v.persona !== D.chars[ci].persona) poolClear(ci);
+      Object.assign(D.chars[ci], v);
+      if (ci === 0 && D.chars[0].name !== '캐릭터1') unlock('first_name');
+    }
+    if (p.addChar) enableChar1();
+    save(); emit('change');
+  }
+  setInterval(() => {
+    // 백업 가져오기 / 초기화: 저장 데이터를 통째로 바꾸고 새로고침
+    const imp = localStorage.getItem(IMPORT_KEY);
+    if (imp) {
+      skipSave = true;
+      try {
+        const obj = JSON.parse(imp);
+        Object.keys(localStorage).filter(k => k.startsWith('deskpet')).forEach(k => localStorage.removeItem(k));
+        for (const [k, v] of Object.entries(obj)) if (k.startsWith('deskpet') && typeof v === 'string') localStorage.setItem(k, v);
+      } catch (e) { console.error(e); }
+      localStorage.removeItem(IMPORT_KEY);
+      location.reload();
+      return;
+    }
+    for (const p of jget(PATCH_KEY, [])) if (p.ts > lastPatchTs) { lastPatchTs = p.ts; applyPatch(p); }
+    const sr = jget('deskpet_say', null);           // 대사 풀 창의 ▶ 말해보기
+    if (sr && sr.ts > lastSayTs) { lastSayTs = sr.ts; if (sr.ci < charCount) { emit('bounce', sr.ci); say(sr.ci, sr.text); } }
+    const it = parseInt(localStorage.getItem(IMG_SIGNAL) || '0');
+    if (it > lastImgTs) { lastImgTs = it; unlock('first_image'); emit('images'); }
+  }, 700);
+
+  // ---------- 시작 ----------
+  setTimeout(() => {
+    aiSpeak(0, 'greeting');
+    if (charCount === 2) setTimeout(() => aiSpeak(1, 'greeting'), 1800);
+    setTimeout(() => {
+      if (getPoolTotal(0) < 325) refillPool(0, true);
+      if (charCount >= 2) setTimeout(() => { if (getPoolTotal(1) < 325) refillPool(1, true); }, 4000);
+    }, 500);
+    if (D.chars[0]?.name && D.chars[0].name !== '캐릭터1') unlock('first_name');
+    const h = new Date().getHours();
+    if (h >= 0 && h < 4) unlock('night_owl');
+  }, 1000);
+  D.chars.forEach((c, i) => { if (c) c.age = calcAge(i); });
+
+  return {
+    D, on, act, click, special, specialState, enableChar1, save, calcAge, meet, tier,
+    count: () => charCount,
+    isDating: () => !!dateTimer,
+    stage: ci => stageById(D.chars[ci]?.stageId),
+    image: ci => { const s = localStorage.getItem(IMG_KEYS[ci]); return s && s.length > 100 ? s : null; },
+    saveImage(ci, dataUrl) {
+      try { localStorage.setItem(IMG_KEYS[ci], dataUrl); } catch { alert('이미지가 너무 커서 저장하지 못했어요. 더 작은 이미지를 써주세요.'); return; }
+      unlock('first_image'); emit('images'); say(ci, '안녕! 잘 부탁해요 🎉');
+    },
+    mood(ci) {
+      const C = D.chars[ci]; if (!C) return '😊';
+      return C.asleep ? '😴' : C.health < 30 ? '🤒' : C.hunger < 20 ? '😫' : C.happy < 20 ? '😢' : C.clean < 20 ? '🤢' : C.happy > 80 && C.hunger > 70 ? '😻' : '😊';
+    },
+    setHostHidden(v) { hostHidden = v; if (v) checkAndNotify(); },
+    toggleSpeed() { speed = speed === 1 ? 20 : 1; say(0, speed > 1 ? '[테스트] 시간 20배속 ⏩' : '[테스트] 정상 속도'); },
+  };
+}
+/* ============================================================================
+   공용 연출 도구: 펫 스프라이트, 튀어오르기 물리, 효과
+   ============================================================================ */
+const PET_COLORS = ['#ffd9a8', '#cfe6ff'];   // 이미지 없을 때 동글이 색 (1번/2번)
+const ANIM_MS = { eat: 2000, play: 1400, pat: 700, bath: 1500, med: 1000 };
+const HEARTS = ['❤️', '💛', '💚', '💜', '🧡'];
+
+// 원본 stepB 그대로: 튀어오를 때 늘어나고 착지할 때 찌부러지는 스쿼시 앤 스트레치
+function Bouncer() {
+  const b = { vel: 0, y: 0, sx: 1, sy: 1, on: false };
+  b.bounce = () => { b.vel = -10; b.on = true; };
+  b.step = () => {
+    if (!b.on) { b.sx += (1 - b.sx) * .18; b.sy += (1 - b.sy) * .18; return; }
+    b.vel += 0.82; b.y += b.vel;
+    if (b.y >= 0) {
+      b.y = 0; const imp = Math.abs(b.vel);
+      if (imp < 1.5) { b.on = false; b.vel = 0; b.sx = 1; b.sy = 1; }
+      else {
+        b.vel = -b.vel * .52; const sq = Math.min(.3, imp * .022);
+        b.sx = 1 + sq * 1.2; b.sy = 1 - sq;
+        setTimeout(() => { b.sx = 1 - sq * .3; b.sy = 1 + sq * .3; }, 55);
+        setTimeout(() => { b.sx = 1; b.sy = 1; }, 130);
+      }
+    } else { const st = Math.min(.15, Math.abs(b.vel) * .011); b.sx = 1 - st * .5; b.sy = 1 + st; }
+  };
+  return b;
+}
+
+// 펫 하나의 DOM. 업로드 이미지가 있으면 이미지, 없으면 동글이 도형
+function PetSprite(E, ci) {
+  const el = document.createElement('div');
+  el.className = 'pet';
+  el.innerHTML =
+    '<div class="pet-flip"><div class="pet-sq"></div></div>' +
+    '<div class="tag zzz">z z</div><div class="tag stink">~ ~</div><div class="tag sweat">💧</div><div class="tag selmark">▼</div>';
+  const sq = el.querySelector('.pet-sq');
+  const s = { el, ci, b: Bouncer(), hasImg: false, bobT: Math.random() * 6 };
+
+  s.setLook = () => {
+    const src = E.image(ci);
+    s.hasImg = !!src;
+    if (src) {
+      sq.innerHTML = '<img class="pet-img" draggable="false" alt="">';
+      sq.firstChild.src = src;
+    } else {
+      sq.innerHTML = '<div class="pet-art"><div class="body" style="background-color:' + PET_COLORS[ci] + '">' +
+        '<div class="eye l"></div><div class="eye r"></div><div class="blush"></div></div></div>';
+    }
+  };
+
+  // x,top: 박스 좌상단 / w: 한 변 길이 / flags: 상태 클래스 문자열
+  s.render = (x, top, w, dir, flags, bob, tilt) => {
+    const C = E.D.chars[ci];
+    s.b.step();
+    el.style.left = x + 'px';
+    el.style.top = top + 'px';
+    el.style.width = el.style.height = w + 'px';
+    el.style.fontSize = Math.max(10, w * .24) + 'px';
+    el.style.setProperty('--s', (w / 72).toFixed(3));
+    el.style.transform = 'translateY(' + (s.b.y + (bob || 0)).toFixed(1) + 'px)';
+    // tilt는 화면 기준 각도(+ = 오른쪽으로 기울기). 좌우 반전된 상태면 안쪽에서 부호를 뒤집어야 화면상 같은 방향
+    const rot = (C.asleep && s.hasImg ? 12 : 0) + (tilt || 0) * (dir < 0 ? -1 : 1);
+    sq.style.transform = 'scale(' + s.b.sx.toFixed(3) + ',' + s.b.sy.toFixed(3) + ')' + (rot ? ' rotate(' + rot.toFixed(1) + 'deg)' : '');
+    el.className = 'pet' + (s.hasImg ? ' has-img' : '') + (dir < 0 ? ' flip' : '') +
+      (C.asleep ? ' sleep' : '') + (C.clean < 20 ? ' dirty' : '') + (C.health < 30 ? ' sick' : '') + (flags || '');
+  };
+
+  s.setLook();
+  return s;
+}
+
+function spawnFx(parent, ch, cx, cy, cls) {
+  const e = document.createElement('div');
+  e.className = cls || 'fx';
+  e.textContent = ch;
+  e.style.left = (cx - 8 + (Math.random() * 20 - 10)) + 'px';
+  e.style.top = (cy - 8) + 'px';
+  e.style.setProperty('--dx', (Math.random() * 16 - 8) + 'px');
+  parent.appendChild(e);
+  setTimeout(() => e.remove(), 1500);
+}
+function spawnPop(parent, emoji, cx, cy) {
+  const e = document.createElement('div');
+  e.className = 'pop'; e.textContent = emoji;
+  e.style.left = cx + 'px'; e.style.top = cy + 'px';
+  parent.appendChild(e);
+  setTimeout(() => e.remove(), 1500);
+}
+function spawnConfetti(parent, x0, w, y0) {
+  const colors = ['#ffd54f', '#ff8a65', '#7bc67e', '#9fa8da', '#ff8fb1', '#4dd0e1'];
+  for (let i = 0; i < 28; i++) setTimeout(() => {
+    const c = document.createElement('div');
+    c.className = 'confetti';
+    c.style.cssText = `left:${x0 + Math.random() * w}px;top:${y0 + Math.random() * 30}px;background:${pickOne(colors)};animation-duration:${0.8 + Math.random()}s;`;
+    parent.appendChild(c);
+    setTimeout(() => c.remove(), 2000);
+  }, i * 40);
+}
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+
+// 이미지 파일 → dataURL
+// localStorage 용량 때문에 줄여서 저장하되, 한 번에 크게 줄이면 거칠어지므로 절반씩 단계적으로 축소
+function readImageFile(file, cb) {
+  const r = new FileReader();
+  r.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 512;
+      if (img.width <= MAX && img.height <= MAX && ev.target.result.length < 700000) return cb(ev.target.result);
+      const k = Math.min(1, MAX / Math.max(img.width, img.height));
+      const tw = Math.round(img.width * k), th = Math.round(img.height * k);
+      let src = img, w = img.width, h = img.height;
+      while (w / 2 >= tw && h / 2 >= th) {
+        const c = document.createElement('canvas');
+        c.width = w = Math.round(w / 2); c.height = h = Math.round(h / 2);
+        const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+        g.drawImage(src, 0, 0, w, h); src = c;
+      }
+      const c = document.createElement('canvas');
+      c.width = tw; c.height = th;
+      const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+      g.drawImage(src, 0, 0, tw, th);
+      cb(c.toDataURL('image/png'));
+    };
+    img.onerror = () => cb(ev.target.result);
+    img.src = ev.target.result;
+  };
+  r.readAsDataURL(file);
+}
+/* ============================================================================
+   둘이 함께하는 움직임(듀오 연출) — 창 모드/자유 모드 공용
+   각 뷰가 아래 어댑터를 제공하면 같은 안무를 그대로 재생한다.
+     A.x(ci)  A.w(ci)                     현재 x(좌상단), 크기
+     A.moveTo(ci, x, v, holdMs, dir)       x로 속도 v(px/ms)로 이동 후 holdMs까지 머묾, 도착하면 dir 방향
+     A.align(a, b)                         (창 모드) 둘의 바닥 높이를 맞춤
+     A.hop(ci, k)  A.face(ci, dir, ms)  A.tilt(ci, deg, ms)  A.busy(ci, ms)
+     A.fx(ci, ch)  A.pop(ch)  A.minX  A.maxX
+   ============================================================================ */
+function runDuo(A, kind, a, b) {
+  const at = (ms, fn) => setTimeout(fn, ms);
+  const L = A.x(a) <= A.x(b) ? a : b, R = L === a ? b : a;
+  const hold = ms => { A.busy(a, ms); A.busy(b, ms); };
+
+  // 둘을 중앙에서 만나게: gapK = 두 몸 평균 폭 대비 간격 (음수면 겹침)
+  function meet(gapK, ms, v = .14) {
+    A.align(a, b);
+    const wl = A.w(L), wr = A.w(R), gap = gapK * (wl + wr) / 2;
+    let cx = (A.x(L) + wl / 2 + A.x(R) + wr / 2) / 2;
+    cx = clampN(cx, A.minX + wl + gap / 2, A.maxX() - wr - gap / 2);
+    A.moveTo(L, cx - gap / 2 - wl, v, ms, 1);
+    A.moveTo(R, cx + gap / 2, v, ms, -1);
+  }
+
+  // a만 b 옆으로 다가감 (b는 그대로 — 자는 상대용)
+  function approach(gapK, ms, v) {
+    A.align(a, b, true);
+    const wa = A.w(a), wb = A.w(b), gap = gapK * (wa + wb) / 2;
+    const side = A.x(a) + wa / 2 <= A.x(b) + wb / 2 ? -1 : 1;
+    let tx = side < 0 ? A.x(b) - gap - wa : A.x(b) + wb + gap;
+    if (tx < A.minX || tx > A.maxX() - wa) tx = side < 0 ? A.x(b) + wb + gap : A.x(b) - gap - wa;
+    A.moveTo(a, clampN(tx, A.minX, A.maxX() - wa), v, ms, tx < A.x(b) ? 1 : -1);
+  }
+
+  switch (kind) {
+    case 'flinch': {          // 😒 상대(b)가 움찔 → 뒤로 물러나며 외면
+      hold(1800);
+      const away = A.x(b) >= A.x(a) ? 1 : -1;
+      A.hop(b, .55); A.fx(b, '💦'); A.fx(a, '❓');
+      A.moveTo(b, A.x(b) + away * 38, .12, 1800, away);
+      A.face(a, away, 1800);
+      break;
+    }
+    case 'peek': {            // 🙂 슬쩍 쳐다보다 고개 돌리기
+      hold(2400);
+      A.face(L, 1, 1100); A.face(R, -1, 1100);
+      A.pop('👀');
+      at(500, () => A.tilt(a, A.x(a) < A.x(b) ? 8 : -8, 600));
+      at(1100, () => { A.face(b, A.x(b) < A.x(a) ? -1 : 1, 1300); A.hop(b, .35); A.fx(b, '💦'); });
+      break;
+    }
+    case 'highfive': {        // 😊 다가가서 동시에 점프 → 손뼉
+      meet(.08, 2000, .16);
+      at(650, () => { A.hop(L, .8); A.hop(R, .8); });
+      at(820, () => { A.pop('✋'); A.fx(L, '✨'); A.fx(R, '✨'); });
+      break;
+    }
+    case 'chase': {           // 😊 술래잡기: 도망가는 쪽을 쫓아감
+      const run = Math.random() < .5 ? a : b, chaser = run === a ? b : a;
+      const dir = A.x(run) >= A.x(chaser) ? 1 : -1;
+      let tx = A.x(run) + dir * 170;
+      if (tx < A.minX || tx > A.maxX() - A.w(run)) { tx = A.x(run) - dir * 170; }
+      tx = clampN(tx, A.minX, A.maxX() - A.w(run));
+      const d2 = tx >= A.x(run) ? 1 : -1;
+      A.align(a, b);
+      A.hop(run, .5); A.fx(run, '💨');
+      A.moveTo(run, tx, .15, 3400, -d2);
+      at(250, () => A.moveTo(chaser, tx - d2 * A.w(chaser) * .9, .12, 3150, d2));
+      at(2600, () => { A.hop(chaser, .7); A.pop('🎵'); });
+      at(2800, () => { A.hop(run, .7); A.fx(run, '😆'); });
+      break;
+    }
+    case 'hug': {             // 😄 서로 기대기
+      meet(-.28, 3600, .12);
+      at(700, () => { A.tilt(L, 10, 2400); A.tilt(R, -10, 2400); });
+      [800, 1300, 1900, 2500].forEach((ms, i) => at(ms, () => A.fx(i % 2 ? R : L, pickOne(HEARTS))));
+      break;
+    }
+    case 'dance': {           // 💕 번갈아 뛰며 빙글
+      meet(.25, 3800, .15);
+      [600, 950, 1300, 1650, 2000, 2350].forEach((ms, i) => at(ms, () => {
+        const who = i % 2 ? R : L;
+        A.hop(who, .75);
+        A.face(who, (i >> 1) % 2 ? (who === L ? -1 : 1) : (who === L ? 1 : -1), 400);
+        if (i % 2 === 0) A.fx(who, pickOne(['🎵', '🎶', '✨']));
+      }));
+      at(2700, () => A.pop('🌟'));
+      break;
+    }
+    case 'bump': {            // 위에 떨어뜨림: 맞은 쪽(b)이 튕겨 밀려남
+      hold(1500);
+      const away = A.x(b) >= A.x(a) ? 1 : -1;
+      A.pop('💥'); A.hop(b, .9);
+      A.moveTo(b, A.x(b) + away * 44, .2, 1500, -away);
+      A.tilt(b, away * 14, 500);
+      break;
+    }
+    case 'nuzzle-sleep': {    // 친한 상대가 자는 중: 살짝 기대고 끝
+      approach(-.15, 2600, .1);
+      at(500, () => A.tilt(a, A.x(a) < A.x(b) ? 9 : -9, 1800));
+      at(700, () => A.fx(a, '💤'));
+      break;
+    }
+    case 'guard': {           // 자는 친구 옆에 와서 지켜주기
+      approach(.1, 6000, .08);
+      at(1500, () => A.fx(a, '🤫'));
+      at(3500, () => A.fx(b, '💤'));
+      break;
+    }
+  }
+}
+/* ============================================================================
+   창 모드 뷰 (레트로 다마고치 창, 360x300 CSS px — 배율은 C#이 Zoom으로 처리)
+   ============================================================================ */
+function initWindowView(E) {
+  const D = E.D;
+  const room = $('#room'), msg = $('#msg');
+  const RW = 236, RH = 160;               // 방 내부 크기
+  const FOOT_MIN = 98, FOOT_MAX = 156;    // 펫 발 위치(y)가 다닐 수 있는 바닥 범위
+  const BASE = 76;                        // 어른 크기(px). 성장 단계 배율을 곱함 (아기 46px)
+  const size = ci => Math.round(BASE * E.stage(ci).scale);
+  let sel = 0;
+
+  const P = [0, 1].map(ci => {
+    const s = PetSprite(E, ci);
+    room.appendChild(s.el);
+    return Object.assign(s, {
+      x: ci ? 150 : 50, fy: ci ? 128 : 134, tx: 0, tfy: 0, dir: ci ? -1 : 1,
+      walking: false, idleUntil: 0, busyUntil: 0, anim: '', animUntil: 0, forced: null, faceUntil: 0,
+      tilt: 0, tiltUntil: 0, dragging: false, vy: 0, falling: false,
+    });
+  });
+  const active = ci => ci < E.count();
+  const center = ci => ({ x: P[ci].x + size(ci) / 2, y: P[ci].fy - size(ci) });
+
+  // ---------- 메시지 창: 최근 두 줄 ----------
+  let lines = [];
+  function pushLine(html) {
+    lines.push(html); lines = lines.slice(-2);
+    msg.innerHTML = lines.map((l, i) => '<div class="line' + (i === lines.length - 1 ? ' new' : ' old') + '">' + l + '</div>').join('');
+  }
+  E.on('say', (ci, t) => pushLine('<span class="who">' + esc(D.chars[ci]?.name) + ':</span>' + esc(t)));
+  const sys = t => pushLine('<span class="sys">' + esc(t) + '</span>');
+
+  // ---------- 연출 이벤트 ----------
+  E.on('bounce', ci => active(ci) && P[ci].b.bounce());
+  E.on('heart', ci => { if (!active(ci)) return; const c = center(ci); spawnFx(room, pickOne(HEARTS), c.x, c.y); });
+  E.on('pop', emoji => {
+    const cs = [0, 1].filter(active).map(center);
+    const cx = cs.reduce((a, c) => a + c.x, 0) / cs.length, cy = Math.min(...cs.map(c => c.y));
+    spawnPop(room, emoji, cx, cy - 6);
+  });
+  E.on('confetti', () => spawnConfetti(room, 0, RW - 10, 0));
+  E.on('anim', (ci, name) => {
+    const p = P[ci], now = performance.now(), ms = ANIM_MS[name] || 800;
+    p.anim = name; p.animUntil = now + ms; p.busyUntil = now + ms; p.walking = false;
+    const c = center(ci);
+    if (name === 'eat') {                                  // 밥그릇을 펫 앞에
+      const bowl = document.createElement('div');
+      bowl.className = 'bowl'; bowl.textContent = '🍚';
+      const w = size(ci);
+      bowl.style.left = clampN(p.dir > 0 ? p.x + w - 4 : p.x - 16, 0, RW - 20) + 'px';
+      bowl.style.top = (p.fy - 20) + 'px';
+      bowl.style.zIndex = 10 + Math.round(p.fy) + 1;
+      room.appendChild(bowl);
+      setTimeout(() => bowl.remove(), ms);
+    }
+    const fx = { play: ['🎵', '🎾'], bath: ['🧼', '✨', '💦'], med: ['💊', '✨'] }[name];
+    if (fx) fx.forEach((ch, i) => setTimeout(() => spawnFx(room, ch, c.x, c.y), i * 200));
+  });
+
+  let bannerT = 0;
+  E.on('banner', (html, ms) => {
+    const b = $('#banner');
+    b.innerHTML = html; b.classList.add('show');
+    clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('show'), ms);
+  });
+
+  // 둘이 가까이 모이는 연출 (선물/뽀뽀/데이트/상호작용)
+  E.on('closer', (kind, ms) => {
+    if (E.count() < 2) return;
+    const now = performance.now();
+    const [L, R] = P[0].x <= P[1].x ? [0, 1] : [1, 0];
+    if (kind === 'peek') {                                 // 슬쩍 쳐다보기만
+      P[L].dir = 1; P[R].dir = -1;
+      P.forEach(p => { p.walking = false; p.faceUntil = now + ms; p.busyUntil = now + ms; });
+      return;
+    }
+    const wl = size(L), wr = size(R);
+    const gap = { kiss: -.3, date: .05, gift: .2, near: .35 }[kind] * (wl + wr) / 2;
+    let cx = (center(0).x + center(1).x) / 2;
+    cx = clampN(cx, wl + gap / 2 + 6, RW - wr - gap / 2 - 6);
+    const fy = clampN((P[0].fy + P[1].fy) / 2, FOOT_MIN + 10, FOOT_MAX);
+    P[L].forced = { tx: cx - gap / 2 - wl, tfy: fy, until: now + ms, dir: 1 };
+    P[R].forced = { tx: cx + gap / 2, tfy: fy, until: now + ms, dir: -1 };
+  });
+
+  // ---------- 듀오 연출 어댑터 (17-duo.js의 runDuo가 사용) ----------
+  const DUO = {
+    x: ci => P[ci].x, w: size, minX: 2, maxX: () => RW - 2,
+    moveTo(ci, x, v, ms, dir) {
+      const p = P[ci], now = performance.now();
+      p.walking = false;
+      p.forced = { tx: clampN(x, 2, RW - size(ci) - 2), tfy: p.duoFy ?? p.fy, until: now + ms, dir, v };
+    },
+    align(a, b, onlyA) {                                  // 방은 2D라 만날 때 바닥 높이를 맞춤
+      const fy = onlyA ? P[b].fy : clampN((P[a].fy + P[b].fy) / 2, FOOT_MIN + 8, FOOT_MAX);
+      P[a].duoFy = fy; if (!onlyA) P[b].duoFy = fy;
+      setTimeout(() => { P[a].duoFy = P[b].duoFy = undefined; }, 400);
+    },
+    hop: (ci, k) => { const b = P[ci].b; b.vel = -10 * k; b.on = true; },
+    face(ci, dir, ms) { const p = P[ci], now = performance.now(); p.dir = dir; p.faceUntil = now + ms; p.busyUntil = Math.max(p.busyUntil, now + ms); p.walking = false; },
+    tilt(ci, deg, ms) { P[ci].tilt = deg; P[ci].tiltUntil = performance.now() + ms; },
+    busy(ci, ms) { const p = P[ci]; p.busyUntil = Math.max(p.busyUntil, performance.now() + ms); p.walking = false; },
+    fx(ci, ch) { const c = center(ci); spawnFx(room, ch, c.x, c.y); },
+    pop(ch) {
+      const cs = [0, 1].filter(active).map(center);
+      spawnPop(room, ch, cs.reduce((a, c) => a + c.x, 0) / cs.length, Math.min(...cs.map(c => c.y)) - 6);
+    },
+  };
+  E.on('duo', (kind, a, b) => { if (E.count() === 2 && !P[a].dragging && !P[b].dragging) runDuo(DUO, kind, a, b); });
+
+  E.on('date', theme => {
+    const bg = $('#date-bg');
+    if (theme) {
+      bg.style.background = theme.sky;
+      bg.innerHTML = '<div class="date-ground"></div>';
+      bg.firstChild.style.background = theme.ground;
+      bg.classList.add('show');
+    } else bg.classList.remove('show');
+    renderToolbar();
+  });
+
+  E.on('images', () => P.forEach(p => p.setLook()));
+  E.on('scale', v => post({ type: 'scale', value: v }));
+  E.on('chars', () => { render(); });
+  E.on('change', render);
+
+  // ---------- 상태 패널 / 제목 / 툴바 ----------
+
+  function render() {
+    if (sel >= E.count()) sel = 0;
+    const C = D.chars[sel], two = E.count() === 2;
+    $('#tb-name').textContent = two ? `${D.chars[0].name} · ${D.chars[1].name}` : C.name;
+    $('#st-head').innerHTML = two
+      ? '<button class="selbtn" id="sel-prev">◀</button><span>' + esc(C.name) + '</span><button class="selbtn" id="sel-next">▶</button>'
+      : '<span>' + esc(C.name) + '</span>';
+    if (two) $('#sel-prev').onclick = $('#sel-next').onclick = () => { sel = 1 - sel; render(); };
+    for (const k of STAT_VIEW) {
+      const td = $('#st-' + k), v = Math.round(statValue(C, k));
+      td.textContent = v;
+      td.classList.toggle('bad', statBad(v));
+    }
+    const st = E.stage(sel);
+    $('#st-age').textContent = `${st.emoji} ${st.label} · ${C.age || 0}일 ${E.mood(sel)}`;
+    const aff = $('#st-aff');
+    aff.style.display = two ? '' : 'none';
+    if (two) aff.textContent = `${getAffinityLabel(D.common.affinity)[1]} ${Math.round(D.common.affinity)}`;
+    $('#add-char').style.display = two ? 'none' : '';
+    $('#hg').style.display = two ? '' : 'none';
+    if (two) {
+      const filled = Math.round(D.common.affinity / 1000 * 5);
+      $('#hg').innerHTML = [0, 1, 2, 3, 4].map(i => i < filled ? '❤️' : '<span class="empty">🖤</span>').join('');
+    }
+    room.classList.toggle('sleeping', [0, 1].filter(active).every(ci => D.chars[ci].asleep));
+    renderToolbar();
+  }
+  function renderToolbar() {
+    const dating = E.isDating(), C = D.chars[sel];
+    document.querySelectorAll('#toolbar [data-act]').forEach(b => b.disabled = dating);
+    const sb = $('#toolbar [data-act=sleep]');
+    sb.textContent = C.asleep ? '☀️' : '🌙';
+    sb.title = C.asleep ? '깨우기' : '재우기';
+    $('#sp-btn').style.display = E.count() === 2 ? '' : 'none';
+    $('#sp-btn').disabled = dating;
+    if ($('#sp-pop').classList.contains('show')) renderSpecial();
+  }
+  function renderSpecial() {
+    for (const key of ['gift', 'kiss', 'date']) {
+      const b = $('#sp-' + key), st = E.specialState(key);
+      b.classList.toggle('locked', !!st.locked);
+      b.classList.toggle('cooldown', !!st.cooldownMin);
+      b.querySelector('small').textContent = st.locked ? `💕${st.need}` : st.cooldownMin ? `${st.cooldownMin}분 후` : '';
+    }
+  }
+  setInterval(renderToolbar, 30000);
+
+  // ---------- 창밖 풍경: 시간대 하늘 + 계절 입자 (원본 테마 색) ----------
+  const TIME_THEMES = {
+    dawn:    { sky: 'linear-gradient(180deg,#ffb347 0%,#ffcc80 40%,#ffe0b2 100%)', cel: '🌤️', stars: 0 },
+    day:     { sky: 'linear-gradient(180deg,#42a5f5 0%,#90caf9 55%,#e3f2fd 100%)', cel: '☀️', stars: 0 },
+    dusk:    { sky: 'linear-gradient(180deg,#7e57c2 0%,#ef6c00 45%,#ffb74d 100%)', cel: '🌇', stars: 0 },
+    evening: { sky: 'linear-gradient(180deg,#1a237e 0%,#283593 50%,#3949ab 100%)', cel: '🌙', stars: 3 },
+    night:   { sky: 'linear-gradient(180deg,#0d0d1a 0%,#0d1b3e 60%,#1a237e 100%)', cel: '🌕', stars: 5 },
+  };
+  const tod = h => h >= 5 && h < 8 ? 'dawn' : h >= 8 && h < 17 ? 'day' : h >= 17 && h < 19 ? 'dusk' : h >= 19 && h < 22 ? 'evening' : 'night';
+  const season = m => m >= 2 && m <= 4 ? '🌸' : m >= 8 && m <= 10 ? '🍂' : (m <= 1 || m === 11) ? '❄️' : null;
+  let curTod = '';
+  function scenery() {
+    const d = new Date(), h = d.getHours(), m = d.getMinutes();
+    $('#ampm').textContent = h < 12 ? 'AM' : 'PM';
+    $('#clk').textContent = String(h % 12 || 12).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+    const t = tod(h);
+    if (t === curTod) return;
+    curTod = t;
+    const th = TIME_THEMES[t], sky = $('#sky');
+    sky.style.background = th.sky;
+    sky.innerHTML = '<span class="cel">' + th.cel + '</span>' +
+      Array.from({ length: th.stars }, () => `<span class="star" style="left:${rnd(4, 50)}px;top:${rnd(3, 30)}px"></span>`).join('');
+  }
+  scenery(); setInterval(scenery, 10000);
+  setInterval(() => {
+    const ch = season(new Date().getMonth()); if (!ch) return;
+    const p = document.createElement('span');
+    p.className = 'sp'; p.textContent = ch;
+    p.style.left = rnd(0, 50) + 'px'; p.style.animationDuration = rnd(3, 5) + 's';
+    $('#sky').appendChild(p); setTimeout(() => p.remove(), 5200);
+  }, 2600);
+
+  // ---------- 방 안 돌아다니기 ----------
+  function pickTarget(ci) {
+    const p = P[ci], w = size(ci);
+    if (E.count() === 2 && Math.random() < .65) {           // 호감도가 높을수록 상대 가까이
+      const o = P[1 - ci], aff = D.common.affinity;
+      const dist = aff <= 200 ? 150 : aff <= 400 ? 110 : aff <= 600 ? 80 : aff <= 800 ? 55 : 40;
+      const side = (p.x < o.x ? -1 : 1) * (Math.random() < .2 ? -1 : 1);
+      p.tx = o.x + side * dist; p.tfy = o.fy + rnd(-14, 14);
+    } else { p.tx = rnd(4, RW - w - 4); p.tfy = rnd(FOOT_MIN, FOOT_MAX); }
+    p.tx = clampN(p.tx, 4, RW - w - 4); p.tfy = clampN(p.tfy, FOOT_MIN, FOOT_MAX);
+    p.dir = p.tx >= p.x ? 1 : -1;
+    p.walking = true;
+  }
+  function moveTo(p, tx, tfy, v) {
+    const dx = tx - p.x, dy = tfy - p.fy, d = Math.hypot(dx, dy);
+    if (d <= v) { p.x = tx; p.fy = tfy; return true; }
+    p.x += dx / d * v; p.fy += dy / d * v;
+    if (Math.abs(dx) > .5) p.dir = dx > 0 ? 1 : -1;
+    return false;
+  }
+
+  let contactAt = 0;
+  // 들었다 놓은 펫이 착지했을 때: 상대 위면 쿵, 옆이면 만남
+  function landed(ci) {
+    if (E.count() < 2 || !P[ci].dropped) return;
+    P[ci].dropped = false;
+    const o = 1 - ci, dx = Math.abs(center(ci).x - center(o).x), dy = Math.abs(P[ci].fy - P[o].fy);
+    const avg = (size(ci) + size(o)) / 2;
+    if (dx < avg * .55 && dy < 22) E.meet(ci, 'bump');
+    else if (dx < avg * 1.6 && dy < 36) E.meet(ci, 'drop');
+  }
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(50, now - last); last = now;
+    const two = E.count() === 2;
+    for (const p of P) {
+      const ci = p.ci, C = D.chars[ci];
+      p.el.style.display = active(ci) ? '' : 'none';
+      if (!active(ci)) continue;
+      const w = size(ci);
+      let moving = false;
+      if (p.dragging) {
+        // 들려 있음: 위치는 입력에서 갱신
+      } else if (p.falling) {                             // 들었다 놓으면 바닥으로 떨어짐
+        p.vy += .03 * dt; p.fy += p.vy * dt;
+        if (p.fy >= p.landFy) { p.fy = p.landFy; p.falling = false; p.vy = 0; p.b.bounce(); landed(ci); }
+      } else if (p.forced) {
+        const arrived = moveTo(p, p.forced.tx, p.forced.tfy, (p.forced.v || .09) * dt);
+        moving = !arrived;
+        if (arrived && p.forced.dir) p.dir = p.forced.dir;
+        if (now > p.forced.until) { p.forced = null; p.idleUntil = now + 800; p.walking = false; }
+      } else if (!C.asleep && now > p.busyUntil && !E.isDating()) {
+        if (p.walking) {
+          moving = true;
+          if (moveTo(p, p.tx, p.tfy, .028 * dt)) { p.walking = false; p.idleUntil = now + rnd(1500, 4500); }
+        } else if (now > p.idleUntil) pickTarget(ci);
+        else if (two && now > p.faceUntil) {                // 서 있을 때: 친하면 마주 보고, 서먹하면 등 돌림
+          const aff = D.common.affinity, toward = P[1 - ci].x > p.x ? 1 : -1;
+          if (aff <= 200) p.dir = -toward; else if (aff > 400) p.dir = toward;
+        }
+      }
+      // 다른 펫이 들려 있으면 쳐다봄 (친하면 따라오고, 서먹하면 외면)
+      const o = P[1 - ci];
+      if (two && o.dragging && !p.dragging && !C.asleep && !p.forced) {
+        const toward = o.x > p.x ? 1 : -1, t = E.tier();
+        p.dir = t === 0 ? -toward : toward; p.walking = false;
+        if (t >= 3 && Math.abs(o.x - p.x) > w * .8) { p.x += toward * .05 * dt; moving = true; }
+      }
+      p.x = clampN(p.x, 0, RW - w);
+      // 걷다가 마주침
+      if (two && ci === 0 && !p.dragging && !o.dragging && !p.falling && !o.falling && !p.forced && !o.forced && now > contactAt) {
+        const d = Math.hypot(center(0).x - center(1).x, (P[0].fy - P[1].fy) * 1.6);
+        if (d < (size(0) + size(1)) / 2 * .85) {
+          contactAt = now + 4000;
+          if (Math.random() < .45) E.meet(P[0].walking ? 0 : 1, 'walk');
+        }
+      }
+      const tilt = p.dragging ? Math.sin(now / 160) * 9 : now < p.tiltUntil ? p.tilt : 0;   // 들리면 대롱대롱
+      const flags = (moving ? ' walk' : '') + (now < p.animUntil ? ' ' + p.anim : '') + (two && ci === sel ? ' sel' : '') + (p.dragging ? ' dragging' : '');
+      const bob = p.hasImg && !moving && !p.b.on && !C.asleep && !p.dragging ? Math.sin(now / 240 + ci * 1.5) * 2 : 0;
+      p.render(p.x, p.fy - w, w, p.dir, flags, bob, tilt);
+      p.el.style.zIndex = 10 + Math.round(p.fy);           // 아래쪽일수록 앞
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- 입력 ----------
+  const fileIn = $('#img-file');
+  let uploadCi = 0;
+  P.forEach(p => {
+    p.el.title = '클릭: 반응 · 우클릭: 이미지 넣기';
+    // 누르고 5px 넘게 움직이면 들기, 아니면 클릭
+    let down = null;
+    p.el.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      const r = room.getBoundingClientRect();
+      down = { x: e.clientX, y: e.clientY, ox: e.clientX - r.left - p.x, oy: e.clientY - r.top - p.fy };
+      p.el.setPointerCapture(e.pointerId);
+    });
+    p.el.addEventListener('pointermove', e => {
+      if (!down) return;
+      if (!p.dragging && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 5) {
+        p.dragging = true; p.forced = null; p.walking = false; p.falling = false;
+        if (D.chars[p.ci].asleep) { /* 자는 채로 들림 */ }
+      }
+      if (p.dragging) {
+        const r = room.getBoundingClientRect(), w = size(p.ci);
+        p.x = clampN(e.clientX - r.left - down.ox, 0, RW - w);
+        p.fy = clampN(e.clientY - r.top - down.oy, w + 2, FOOT_MAX);
+      }
+    });
+    p.el.addEventListener('pointerup', () => {
+      if (!down) return;
+      down = null;
+      if (!p.dragging) { sel = p.ci; E.click(p.ci); render(); return; }
+      p.dragging = false; p.dropped = true;
+      p.landFy = clampN(p.fy, FOOT_MIN, FOOT_MAX);        // 공중에서 놓으면 바닥으로 떨어짐
+      if (p.fy < p.landFy - 1) { p.falling = true; p.vy = 0; } else landed(p.ci);
+      p.idleUntil = performance.now() + 1200;
+    });
+    p.el.addEventListener('contextmenu', e => { e.preventDefault(); uploadCi = p.ci; fileIn.click(); });
+  });
+  fileIn.onchange = e => {
+    const f = e.target.files[0]; fileIn.value = '';
+    if (f) readImageFile(f, url => E.saveImage(uploadCi, url));
+  };
+  $('#toolbar').addEventListener('click', e => {
+    const b = e.target.closest('[data-act]');
+    if (b && !b.disabled) E.act(sel, b.dataset.act);
+  });
+  $('#sp-btn').onclick = () => { $('#sp-pop').classList.toggle('show'); renderSpecial(); };
+  $('#sp-pop').addEventListener('click', e => {
+    const b = e.target.closest('[data-sp]'); if (!b) return;
+    const st = E.specialState(b.dataset.sp);
+    if (st.locked) return sys(`호감도 ${st.need} 이상이 되면 할 수 있어요`);
+    if (st.cooldownMin) return sys(`${st.cooldownMin}분 뒤에 다시 할 수 있어요`);
+    $('#sp-pop').classList.remove('show');
+    E.special(b.dataset.sp);
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!e.target.closest('#sp-pop, #sp-btn')) $('#sp-pop').classList.remove('show');
+  });
+  $('#add-char').onclick = () => { E.enableChar1(); sel = 1; render(); };
+  $('#to-free').onclick = () => { E.save(); post({ type: 'switchMode', mode: 'free' }); };
+
+  // 타이틀바
+  $('#titlebar').addEventListener('pointerdown', e => {
+    if (e.button === 0 && !e.target.closest('button')) post({ type: 'dragStart' });
+  });
+  const pin = $('#btn-pin');
+  pin.classList.toggle('on', params.get('top') !== '0');
+  pin.onclick = () => { pin.classList.toggle('on'); post({ type: 'topmost', on: pin.classList.contains('on') }); };
+  $('#btn-min').onclick = () => post({ type: 'minimize' });
+  $('#btn-close').onclick = () => { E.save(); post({ type: 'quit' }); };
+  $('#btn-set').onclick = openSettings;
+
+  // ---------- 스크린샷 (창 전체: 방·상태표·대사까지) ----------
+  // 윈도우 앱: WebView2가 실제로 그린 화면을 C#이 그대로 캡처 → 보이는 그대로 나옴.
+  // (html2canvas는 CSS를 다시 그리는 방식이라 반복 그라데이션 벽지·바닥 등을 못 그림)
+  // 일반 브라우저에서 열었을 때만 html2canvas로 대체.
+  const shotName = () => {
+    const name = (D.chars[0]?.name || 'deskpet').replace(/[^a-zA-Z0-9가-힣]/g, '_');
+    const d = new Date(), p2 = n => String(n).padStart(2, '0');
+    return `deskpet_${name}_${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}_${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.png`;
+  };
+  function nativeCapture(action) {
+    $('#sp-pop').classList.remove('show');
+    post({ type: 'capture', action, name: shotName(), vw: innerWidth, x: 0, y: 0, w: innerWidth, h: innerHeight });
+  }
+  onHost('captured', m => sys(m.ok ? m.msg : '캡처 실패: ' + m.msg));
+  const h2c = () => html2canvas($('#win'), { backgroundColor: '#cfc6b4', scale: Math.max(2, devicePixelRatio || 1), logging: false });
+  $('#btn-shot').onclick = async () => {
+    if (bridge) return nativeCapture('save');
+    try {
+      const c = await h2c(), a = document.createElement('a');
+      a.download = shotName(); a.href = c.toDataURL('image/png'); a.click();
+      sys('📷 스크린샷을 저장했어요 (다운로드 폴더)');
+    } catch (e) { sys('스크린샷 실패: ' + e.message); }
+  };
+  $('#btn-copy').onclick = async () => {
+    if (bridge) return nativeCapture('copy');
+    try {
+      const c = await h2c();
+      const blob = await new Promise(r => c.toBlob(r, 'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      sys('📋 클립보드에 복사했어요');
+    } catch (e) { sys('복사 실패: ' + e.message); }
+  };
+
+  onHost('hostHidden', m => E.setHostHidden(!!m.on));
+  post({ type: 'scale', value: D.common.scale || 1 });
+  render();
+  if (!E.image(0)) setTimeout(() => sys('💡 펫을 우클릭하면 캐릭터 이미지를 넣을 수 있어요'), 2600);
+}
+/* ============================================================================
+   자유 모드 뷰 (작업표시줄 위를 돌아다니는 투명 오버레이)
+   ============================================================================ */
+function initFreeView(E) {
+  const D = E.D;
+  const root = $('#free'), menu = $('#menu');
+  const BASE = 78;                                   // 원본 캐릭터 크기
+  const size = ci => Math.round(BASE * E.stage(ci).scale);
+  const ground = () => innerHeight;
+  const active = ci => ci < E.count();
+
+  const P = [0, 1].map(ci => {
+    const s = PetSprite(E, ci);
+    root.appendChild(s.el);
+    const bub = document.createElement('div');
+    bub.className = 'fbubble'; root.appendChild(bub);
+    return Object.assign(s, {
+      bub, bubT: 0,
+      x: 180 + ci * 140, y: 0, vy: 0, dir: ci ? -1 : 1,
+      mode: 'idle', modeUntil: 0, anim: '', animUntil: 0, forced: null, faceUntil: 0, onGround: false,
+      tilt: 0, tiltUntil: 0, busyUntil: 0, dropped: false,
+    });
+  });
+  P.forEach(p => { p.y = ground() - size(p.ci); });
+  const center = ci => ({ x: P[ci].x + size(ci) / 2, y: P[ci].y });
+
+  // ---------- 말풍선 (설정의 대사 지속 시간 적용, 10 = 다음 대사까지) ----------
+  E.on('say', (ci, t) => bubble(ci, t));
+  function bubble(ci, t) {
+    const p = P[ci]; if (!p || !active(ci)) return;
+    p.bub.textContent = t; p.bub.classList.add('show');
+    clearTimeout(p.bubT);
+    const dur = D.common.bubbleDur ?? 3;
+    if (dur < 10) p.bubT = setTimeout(() => p.bub.classList.remove('show'), dur * 1000);
+  }
+
+  // ---------- 연출 ----------
+  E.on('bounce', ci => active(ci) && P[ci].b.bounce());
+  E.on('heart', ci => { if (!active(ci)) return; const c = center(ci); spawnFx(root, pickOne(HEARTS), c.x, c.y); });
+  E.on('pop', emoji => {
+    const cs = [0, 1].filter(active).map(center);
+    spawnPop(root, emoji, cs.reduce((a, c) => a + c.x, 0) / cs.length, Math.min(...cs.map(c => c.y)) - 10);
+  });
+  E.on('confetti', () => {
+    const cs = [0, 1].filter(active).map(center);
+    const x0 = Math.min(...cs.map(c => c.x)) - 120;
+    spawnConfetti(root, x0, Math.max(...cs.map(c => c.x)) - x0 + 120, ground() - 260);
+  });
+  E.on('anim', (ci, name) => {
+    const p = P[ci], now = performance.now(), ms = ANIM_MS[name] || 800;
+    p.anim = name; p.animUntil = now + ms; p.mode = 'idle'; p.modeUntil = now + ms + 400;
+    if (name === 'play') p.vy = -9;
+    const c = center(ci);
+    const fx = { eat: ['🍚'], play: ['🎵', '🎾'], bath: ['🧼', '✨', '💦'], med: ['💊', '✨'] }[name];
+    if (fx) fx.forEach((ch, i) => setTimeout(() => spawnFx(root, ch, c.x, c.y), i * 200));
+  });
+  let bannerT = 0;
+  E.on('banner', (html, ms) => {
+    const b = $('#fbanner'), cs = [0, 1].filter(active).map(center);
+    b.innerHTML = html; b.classList.add('show');
+    b.style.left = clampN(cs.reduce((a, c) => a + c.x, 0) / cs.length - b.offsetWidth / 2, 8, innerWidth - b.offsetWidth - 8) + 'px';
+    b.style.top = (ground() - 230) + 'px';
+    clearTimeout(bannerT); bannerT = setTimeout(() => b.classList.remove('show'), ms);
+  });
+  E.on('closer', (kind, ms) => {
+    if (E.count() < 2) return;
+    const now = performance.now();
+    const [L, R] = P[0].x <= P[1].x ? [0, 1] : [1, 0];
+    if (kind === 'peek') { P[L].dir = 1; P[R].dir = -1; P.forEach(p => { p.mode = 'idle'; p.modeUntil = p.faceUntil = now + ms; }); return; }
+    const wl = size(L), wr = size(R);
+    const gap = { kiss: -.3, date: .05, gift: .2, near: .35 }[kind] * (wl + wr) / 2;
+    const cx = clampN((center(0).x + center(1).x) / 2, wl + 10, innerWidth - wr - 10);
+    P[L].forced = { tx: cx - gap / 2 - wl, until: now + ms, dir: 1 };
+    P[R].forced = { tx: cx + gap / 2, until: now + ms, dir: -1 };
+  });
+  // ---------- 듀오 연출 어댑터 (17-duo.js의 runDuo가 사용) ----------
+  const DUO = {
+    x: ci => P[ci].x, w: size, minX: 0, maxX: () => innerWidth,
+    moveTo(ci, x, v, ms, dir) {
+      const p = P[ci];
+      p.mode = 'idle';
+      p.forced = { tx: clampN(x, 0, innerWidth - size(ci)), until: performance.now() + ms, dir, v };
+    },
+    align() {},
+    hop: (ci, k) => { const b = P[ci].b; b.vel = -10 * k; b.on = true; },
+    face(ci, dir, ms) { const p = P[ci], now = performance.now(); p.dir = dir; p.faceUntil = now + ms; p.busyUntil = Math.max(p.busyUntil, now + ms); p.mode = 'idle'; },
+    tilt(ci, deg, ms) { P[ci].tilt = deg; P[ci].tiltUntil = performance.now() + ms; },
+    busy(ci, ms) { const p = P[ci]; p.busyUntil = Math.max(p.busyUntil, performance.now() + ms); p.mode = 'idle'; },
+    fx(ci, ch) { const c = center(ci); spawnFx(root, ch, c.x, c.y); },
+    pop(ch) {
+      const cs = [0, 1].filter(active).map(center);
+      spawnPop(root, ch, cs.reduce((a, c) => a + c.x, 0) / cs.length, Math.min(...cs.map(c => c.y)) - 10);
+    },
+  };
+  E.on('duo', (kind, a, b) => { if (E.count() === 2 && !P[a].dragging && !P[b].dragging) runDuo(DUO, kind, a, b); });
+
+  E.on('images', () => P.forEach(p => p.setLook()));
+  E.on('change', () => { if (menuCi >= 0) renderMenu(); });
+
+  // ---------- 우클릭 메뉴 ----------
+  let menuCi = -1;
+  function renderMenu() {
+    const ci = menuCi, C = D.chars[ci]; if (!C) return;
+    const st = E.stage(ci);
+    $('#m-name').textContent = C.name;
+    $('#m-sub').textContent = `${st.emoji} ${st.label} · ${C.age || 0}일 ${E.mood(ci)}`;
+    for (const k of STAT_VIEW) {
+      const v = Math.round(statValue(C, k)), i = $('#m-' + k);
+      i.style.width = v + '%';
+      i.classList.toggle('bad', statBad(v));
+    }
+    menu.querySelector('[data-act=sleep]').textContent = C.asleep ? '☀️ 깨우기' : '💤 재우기';
+    const two = E.count() === 2;
+    $('#m-special').style.display = two ? '' : 'none';
+    $('#m-aff').style.display = two ? '' : 'none';
+    if (two) {
+      $('#m-aff').textContent = `${getAffinityLabel(D.common.affinity)[1]} ${Math.round(D.common.affinity)}`;
+      for (const key of ['gift', 'kiss', 'date']) {
+        const b = menu.querySelector('[data-sp=' + key + ']'), s = E.specialState(key);
+        b.classList.toggle('locked', !!s.locked); b.classList.toggle('cooldown', !!s.cooldownMin);
+        b.querySelector('small').textContent = s.locked ? `💕${s.need}` : s.cooldownMin ? `${s.cooldownMin}분` : '';
+      }
+    }
+    menu.querySelectorAll('button[data-act], button[data-sp]').forEach(b => b.disabled = E.isDating());
+  }
+  function openMenu(ci) { menuCi = ci; menu.classList.add('show'); renderMenu(); placeMenu(); }
+  function closeMenu() { menuCi = -1; menu.classList.remove('show'); }
+  function placeMenu() {
+    if (menuCi < 0) return;
+    const p = P[menuCi], w = size(menuCi), mw = menu.offsetWidth, mh = menu.offsetHeight, gap = 14;
+    const mx = innerWidth - (p.x + w) >= mw + gap + 8 ? p.x + w + gap : p.x - mw - gap;
+    menu.style.left = clampN(mx, 8, innerWidth - mw - 8) + 'px';
+    menu.style.top = clampN(p.y + w - mh, 8, innerHeight - mh - 8) + 'px';
+  }
+  menu.addEventListener('click', e => {
+    const a = e.target.closest('[data-act]'), s = e.target.closest('[data-sp]');
+    if (a && !a.disabled) E.act(menuCi, a.dataset.act);
+    if (s && !s.disabled) {
+      const st = E.specialState(s.dataset.sp);
+      if (st.locked) return bubble(menuCi, `호감도 ${st.need} 이상이면 할 수 있어요`);
+      if (!st.cooldownMin) { closeMenu(); E.special(s.dataset.sp); }
+    }
+  });
+  $('#m-window').onclick = () => { E.save(); post({ type: 'switchMode', mode: 'window' }); };
+  $('#m-set').onclick = () => { closeMenu(); openSettings(); };
+  $('#m-quit').onclick = () => { E.save(); post({ type: 'quit' }); };
+  document.addEventListener('pointerdown', e => {
+    if (!menu.contains(e.target) && !e.target.closest('.pet')) closeMenu();
+  });
+
+  // ---------- 드래그: C#이 커서 좌표를 직접 보내줌 (네이티브 드래그) ----------
+  let dragCi = -1, dragDX = 0, dragDY = 0, downAt = null;
+  const dragBegin = () => { if (dragCi >= 0) { P[dragCi].dragging = true; closeMenu(); } };
+  function dragEnd(moved) {
+    const ci = dragCi; if (ci < 0) return;
+    P[ci].dragging = false; P[ci].vy = 0; dragCi = -1;
+    if (moved) { P[ci].dropped = true; P[ci].forced = null; P[ci].modeUntil = performance.now() + 1500; }
+    if (!moved) E.click(ci);
+  }
+  P.forEach(p => {
+    p.el.addEventListener('contextmenu', e => { e.preventDefault(); menuCi === p.ci ? closeMenu() : openMenu(p.ci); });
+    p.el.addEventListener('pointerdown', e => {
+      if (e.button !== 0) return;
+      dragCi = p.ci; dragDX = e.clientX - p.x; dragDY = e.clientY - p.y;
+      if (bridge) return post({ type: 'dragStart' });
+      downAt = { x: e.clientX, y: e.clientY };          // ↓ 일반 브라우저용 대체 경로
+      p.el.setPointerCapture(e.pointerId);
+    });
+    if (!bridge) {
+      p.el.addEventListener('pointermove', e => {
+        if (!downAt || dragCi !== p.ci) return;
+        if (!p.dragging && Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y) > 5) dragBegin();
+        if (p.dragging) { p.x = e.clientX - dragDX; p.y = e.clientY - dragDY; }
+      });
+      p.el.addEventListener('pointerup', () => { if (downAt) { downAt = null; dragEnd(p.dragging); } });
+    }
+  });
+  onHost('dragMove', m => {
+    if (dragCi < 0) return;
+    const p = P[dragCi];
+    if (!p.dragging) dragBegin();
+    p.x = m.x - dragDX; p.y = m.y - dragDY;
+    p.el.style.left = p.x + 'px'; p.el.style.top = p.y + 'px';   // 다음 프레임까지 기다리지 않고 즉시 반영
+  });
+  onHost('dragEnd', m => dragEnd(m.moved));
+
+  // 들었다 놓은 펫이 착지했을 때: 상대 위면 쿵, 옆이면 만남
+  let contactAt = 0;
+  function landed(ci) {
+    if (E.count() < 2) return;
+    const o = 1 - ci, dx = Math.abs(center(ci).x - center(o).x), avg = (size(ci) + size(o)) / 2;
+    if (dx < avg * .55) E.meet(ci, 'bump');
+    else if (dx < avg * 1.7) E.meet(ci, 'drop');
+  }
+
+  // ---------- 행동 루프 ----------
+  let last = performance.now(), lastHit = 0;
+  function frame(now) {
+    const dt = Math.min(50, now - last); last = now;
+    const two = E.count() === 2;
+    for (const p of P) {
+      const ci = p.ci, C = D.chars[ci];
+      const show = active(ci);
+      p.el.style.display = show ? '' : 'none';
+      if (!show) { p.bub.classList.remove('show'); continue; }
+      const w = size(ci);
+      let moving = false;
+      if (!p.dragging) {
+        const o = P[1 - ci];
+        if (p.forced) {
+          const dx = p.forced.tx - p.x, v = (p.forced.v || .25) * dt;
+          if (Math.abs(dx) > v) { p.x += Math.sign(dx) * v; p.dir = Math.sign(dx); moving = true; }
+          else { p.x = p.forced.tx; if (p.forced.dir) p.dir = p.forced.dir; }
+          if (now > p.forced.until) { p.forced = null; p.modeUntil = now + 800; }
+        } else if (two && o.dragging && !C.asleep) {
+          // 다른 펫이 들려 있으면 쳐다봄 (친하면 밑으로 따라오고, 서먹하면 외면)
+          const toward = o.x > p.x ? 1 : -1, t = E.tier();
+          p.dir = t === 0 ? -toward : toward;
+          if (t >= 3 && Math.abs(o.x - p.x) > w * .9) { p.x += toward * .12 * dt; moving = true; }
+        } else if (!C.asleep && !E.isDating() && menuCi !== ci && now > p.busyUntil) {
+          if (now > p.modeUntil) {
+            p.mode = Math.random() < .6 ? 'walk' : 'idle';
+            if (p.mode === 'walk') {
+              p.dir = Math.random() < .4 ? -p.dir : p.dir;
+              if (two) {                                    // 친하면 다가가고, 서먹하면 멀어짐
+                const o = P[1 - ci], dx = o.x - p.x, aff = D.common.affinity;
+                if (aff > 600 && Math.abs(dx) > 160) p.dir = Math.sign(dx);
+                if (aff <= 200 && Math.abs(dx) < 220) p.dir = -Math.sign(dx) || 1;
+              }
+            }
+            p.modeUntil = now + 2000 + Math.random() * 4000;
+          }
+          if (p.mode === 'walk') {
+            p.x += p.dir * .06 * dt; moving = true;
+            if (p.x < 0) { p.x = 0; p.dir = 1; }
+            if (p.x > innerWidth - w) { p.x = innerWidth - w; p.dir = -1; }
+          } else if (two && now > p.faceUntil) {
+            const aff = D.common.affinity, toward = P[1 - ci].x > p.x ? 1 : -1;
+            if (aff <= 200) p.dir = -toward; else if (aff > 400) p.dir = toward;
+          }
+        }
+        p.vy += .5; p.y += p.vy;                           // 떨어뜨리면 바닥(작업표시줄 위)으로 낙하
+        if (p.y >= ground() - w) {
+          const impact = p.vy;
+          p.y = ground() - w; p.vy = 0;
+          if (p.dropped) { p.dropped = false; if (impact > 4) p.b.bounce(); landed(ci); }
+        }
+        // 걷다가 마주침
+        if (two && ci === 0 && !o.dragging && !p.forced && !o.forced && now > contactAt) {
+          const d = Math.abs(center(0).x - center(1).x);
+          if (d < (size(0) + size(1)) / 2 * .8) {
+            contactAt = now + 4000;
+            if (Math.random() < .45) E.meet(p.mode === 'walk' ? 0 : 1, 'walk');
+          }
+        }
+      }
+      const flags = (moving ? ' walk' : '') + (now < p.animUntil ? ' ' + p.anim : '') + (p.dragging ? ' dragging' : '');
+      const bob = p.hasImg && !moving && !p.b.on && !C.asleep && !p.dragging ? Math.sin(now / 240 + ci * 1.5) * 2.3 : 0;
+      const tilt = p.dragging ? Math.sin(now / 160) * 10 : now < p.tiltUntil ? p.tilt : 0;   // 들리면 대롱대롱
+      p.render(p.x, p.y, w, p.dir, flags, bob, tilt);
+      p.bub.style.left = clampN(p.x + w / 2 - p.bub.offsetWidth / 2, 4, innerWidth - p.bub.offsetWidth - 4) + 'px';
+      p.bub.style.top = (p.y + p.b.y - p.bub.offsetHeight - 10) + 'px';
+    }
+    placeMenu();
+
+    // 클릭 가능 영역을 C#에 보고 (나머지 영역은 뒤 창으로 클릭 통과)
+    if (bridge && now - lastHit > 40) {
+      lastHit = now;
+      const pad = 10, rects = [];
+      const els = P.filter(p => active(p.ci)).map(p => p.el);
+      if (menuCi >= 0) els.push(menu);
+      for (const el of els) {
+        const r = el.getBoundingClientRect();
+        rects.push({ x: r.left - pad, y: r.top - pad, w: r.width + pad * 2, h: r.height + pad * 2 });
+      }
+      post({ type: 'hitRects', rects });
+    }
+    requestAnimationFrame(frame);
+  }
+  addEventListener('resize', () => P.forEach(p => { p.y = Math.min(p.y, ground() - size(p.ci)); }));
+  requestAnimationFrame(frame);
+}
+/* ============================================================================
+   설정 창 (원본 runSettings 기반)
+   - 저장은 전체 데이터를 덮어쓰지 않고 변경분만 메인에 전달(sendPatch)
+   - 윈도우판 추가: 백업 내보내기/가져오기, 초기화
+   ============================================================================ */
+function initSettingsView() {
+  let D = loadD();
+  if (!D.chars) D.chars = [defChar(0)];
+  if (!D.common) D.common = defCommon();
+  const reload = () => { D = loadD(); if (!D.chars) D.chars = [defChar(0)]; if (!D.common) D.common = defCommon(); };
+
+  // ---- 탭 ----
+  document.querySelectorAll('.set-tab').forEach(tab => tab.addEventListener('click', () => {
+    document.querySelectorAll('.set-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    $('#panel-' + tab.dataset.tab).classList.add('active');
+    reload();
+    if (tab.dataset.tab === 'log') renderLog(logFilter);
+    if (tab.dataset.tab === 'diary') renderDiary();
+    if (tab.dataset.tab === 'achv') renderAchv();
+  }));
+  $('#btn-open-pool').onclick = openPool;
+  $('#set-close').onclick = () => bridge ? post({ type: 'closeSettings' }) : window.close();
+
+  // ---- 값 채우기 ----
+  if (D.common.hasChar1) $('#relation-wrap').style.display = 'flex';
+  $('#set-apikey').value = D.common.apiKey || '';
+  $('#set-relation').value = D.common.relation || '';
+  [0, 1].forEach(i => {
+    $('#set-name' + i).value = D.chars[i]?.name || '';
+    $('#set-persona' + i).value = D.chars[i]?.persona || '';
+  });
+
+  const pick = (sel, attr, cur, onPick) => document.querySelectorAll(sel).forEach(b => {
+    b.classList.toggle('active', b.dataset[attr] === String(cur));
+    b.addEventListener('click', () => {
+      document.querySelectorAll(sel).forEach(x => x.classList.remove('active'));
+      b.classList.add('active'); onPick(b.dataset[attr]);
+    });
+  });
+  let scale = D.common.scale || 1, preset = D.common.preset || 'normal', daySpeed = D.common.daySpeed || 'normal';
+  pick('.sz-btn', 'sc', scale, v => scale = parseFloat(v));
+  pick('.ps-btn[data-ps]', 'ps', preset, v => preset = v);
+  pick('.ps-btn[data-ds]', 'ds', daySpeed, v => daySpeed = v);
+
+  // ---- 일기 / 업적 / 로그 ----
+  function renderDiary() {
+    const list = $('#diary-list'), entries = loadDiary().slice().reverse();
+    if (!entries.length) { list.innerHTML = '<div class="log-empty">아직 일기가 없어요 📔</div>'; return; }
+    list.innerHTML = entries.map(e => `<div class="diary-item">
+        <div class="diary-date">📔 ${esc(D.chars[e.ci]?.name || `캐릭터${e.ci + 1}`)} · ${e.day}일째 · ${esc(e.date)}</div>
+        <div class="diary-body">${esc(e.text)}</div></div>`).join('');
+  }
+  function renderAchv() {
+    const got = D.common.achievements || [];
+    $('#achv-count').textContent = `${got.length} / ${ACHIEVEMENTS.length}`;
+    $('#achv-list').innerHTML = ACHIEVEMENTS.map(a => {
+      const done = got.includes(a.id);
+      return `<div class="achv-item${done ? '' : ' locked'}"><div class="achv-emoji">${a.emoji}</div>
+        <div class="achv-info"><div class="achv-name">${a.name}${done ? ' ✅' : ''}</div><div class="achv-desc">${a.desc}</div></div></div>`;
+    }).join('');
+  }
+  renderAchv();
+  let logFilter = 'all';
+  document.querySelectorAll('.log-filter-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.log-filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); logFilter = btn.dataset.lf; renderLog(logFilter);
+  }));
+  function renderLog(filter) {
+    let items = loadLog().slice().reverse();
+    if (filter === '0') items = items.filter(e => e.ci === 0);
+    else if (filter === '1') items = items.filter(e => e.ci === 1);
+    else if (filter === 'fail') items = items.filter(e => e.fail);
+    const list = $('#log-list');
+    if (!items.length) { list.innerHTML = '<div class="log-empty">아직 대사가 없어요</div>'; return; }
+    list.innerHTML = items.map(e => {
+      const t = new Date(e.time);
+      const time = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}`;
+      const line = e.fail ? `<div class="log-line log-fail">❌ ${esc(e.fail)}</div>` : `<div class="log-line">${esc(e.line || '(없음)')}</div>`;
+      return `<div class="log-item"><div class="log-meta"><span class="log-who">${esc(D.chars[e.ci]?.name || `캐릭터${e.ci + 1}`)}</span><span class="log-time">${time}</span></div>
+        <div class="log-trigger">상황: ${esc(TRIGGER_LABELS[e.trigger] || e.trigger)}</div>${line}</div>`;
+    }).join('');
+  }
+
+  // ---- 이미지 (펫 창에서 우클릭해도 넣을 수 있음) ----
+  [0, 1].forEach(i => {
+    const prev = $('#setprev' + i), lbl = $('#imglbl' + i);
+    const src = localStorage.getItem(IMG_KEYS[i]);
+    if (src && src.length > 100) { prev.src = src; prev.style.display = 'block'; lbl.textContent = '✅ 이미지 있음 (클릭해서 변경)'; }
+    $('#imgbox' + i).addEventListener('click', () => $('#setfile' + i).click());
+    $('#setfile' + i).addEventListener('change', e => {
+      const f = e.target.files[0]; if (!f) return;
+      readImageFile(f, url => {
+        try { localStorage.setItem(IMG_KEYS[i], url); } catch { alert('이미지가 너무 커요. 더 작은 이미지를 써주세요.'); return; }
+        prev.src = url; prev.style.display = 'block'; lbl.textContent = '✅ 이미지 있음 (클릭해서 변경)';
+        localStorage.setItem(IMG_SIGNAL, Date.now().toString());
+      });
+    });
+  });
+
+  const flash = id => {
+    const btn = $('#' + id), orig = btn.textContent;
+    btn.classList.add('ok'); btn.textContent = '✅ 저장됐어요!';
+    setTimeout(() => { btn.classList.remove('ok'); btn.textContent = orig; }, 1600);
+  };
+
+  // ---- 알림 / 말풍선 ----
+  const notifyOnEl = $('#set-notify-on'), threshEl = $('#set-notify-threshold'), intervalEl = $('#set-notify-interval'), bubDurEl = $('#set-bubble-dur');
+  const nc = D.common;
+  const durLabel = v => v >= 10 ? '다음 대사까지' : `${v}초`;
+  bubDurEl.value = nc.bubbleDur ?? 3; $('#bubble-dur-val').textContent = durLabel(+bubDurEl.value);
+  bubDurEl.addEventListener('input', () => $('#bubble-dur-val').textContent = durLabel(+bubDurEl.value));
+  notifyOnEl.checked = !!nc.notifyOn;
+  threshEl.value = nc.notifyThreshold || 20; $('#threshold-val').textContent = threshEl.value;
+  intervalEl.value = nc.notifyIntervalMin || 10; $('#interval-val').textContent = intervalEl.value;
+  const ns = nc.notifyStats || { hunger: true, health: true };
+  ['hunger', 'happy', 'energy', 'clean', 'health'].forEach(k => $('#nstat-' + k).checked = !!ns[k]);
+  threshEl.addEventListener('input', () => $('#threshold-val').textContent = threshEl.value);
+  intervalEl.addEventListener('input', () => $('#interval-val').textContent = intervalEl.value);
+  notifyOnEl.addEventListener('change', async () => {
+    if (!notifyOnEl.checked || bridge) return;              // 윈도우판은 트레이 알림이라 권한 불필요
+    if (typeof Notification === 'undefined' || await Notification.requestPermission() !== 'granted') {
+      notifyOnEl.checked = false; $('#notify-perm-warn').style.display = 'block';
+    }
+  });
+
+  if (IS_MAC) {
+    $('#notify-where').textContent = '(맥 알림으로 와요)';
+    $('#autostart-label').textContent = '맥에 로그인할 때 데스크펫도 같이 켜기';
+  }
+
+  // ---- 시작 프로그램 (앱에서만 — 윈도우는 레지스트리, 맥은 로그인 항목) ----
+  if (bridge) {
+    $('#autostart-wrap').style.display = ''; $('#autostart-div').style.display = '';
+    const cb = $('#set-autostart');
+    onHost('autostart', m => { cb.checked = !!m.on; cb.disabled = false; });
+    cb.addEventListener('change', () => { cb.disabled = true; post({ type: 'setAutostart', on: cb.checked }); });
+    post({ type: 'getAutostart' });
+  }
+
+  // ---- 저장: 변경분만 전달 ----
+  $('#btn-save-common').addEventListener('click', () => {
+    sendPatch({ common: {
+      apiKey: $('#set-apikey').value.trim(),
+      relation: $('#set-relation').value.trim(),
+      scale, preset, daySpeed,
+      bubbleDur: parseInt(bubDurEl.value),
+      notifyOn: notifyOnEl.checked,
+      notifyThreshold: parseInt(threshEl.value),
+      notifyIntervalMin: parseInt(intervalEl.value),
+      notifyStats: Object.fromEntries(['hunger', 'happy', 'energy', 'clean', 'health'].map(k => [k, $('#nstat-' + k).checked])),
+    } });
+    flash('btn-save-common');
+  });
+  [0, 1].forEach(i => $('#btn-save' + i).addEventListener('click', () => {
+    sendPatch({ chars: { [i]: {
+      name: $('#set-name' + i).value.trim() || defChar(i).name,
+      persona: $('#set-persona' + i).value.trim(),
+    } } });
+    flash('btn-save' + i);
+  }));
+
+  // ---- 백업 / 초기화 ----
+  const deskpetKeys = () => Object.keys(localStorage).filter(k => k.startsWith('deskpet') && k !== IMPORT_KEY && k !== PATCH_KEY);
+  $('#btn-export').onclick = () => {
+    const obj = Object.fromEntries(deskpetKeys().map(k => [k, localStorage.getItem(k)]));
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(obj)], { type: 'application/json' }));
+    a.download = `deskpet-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    $('#data-msg').textContent = '✅ 내보냈어요 (다운로드 폴더)';
+  };
+  $('#btn-import').onclick = () => $('#import-file').click();
+  $('#import-file').onchange = e => {
+    const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+    f.text().then(txt => {
+      let obj;
+      try { obj = JSON.parse(txt); } catch { return alert('백업 파일을 읽을 수 없어요.'); }
+      if (!obj || typeof obj !== 'object' || !obj[SAVE_KEY]) return alert('데스크펫 백업 파일이 아니에요.');
+      if (!confirm('지금 데이터를 백업 파일 내용으로 바꿀까요?\n현재 스탯·업적·일기·대사 풀·이미지가 모두 교체돼요.')) return;
+      requestReplace(obj, '✅ 가져왔어요!');
+    });
+  };
+  $('#btn-reset').onclick = () => {
+    if (!confirm('⚠️ 정말 초기화할까요?\n스탯, 업적, 일기, 대사 풀이 모두 삭제돼요.\n이미지는 유지돼요.')) return;
+    const keep = {};
+    IMG_KEYS.forEach(k => { const v = localStorage.getItem(k); if (v) keep[k] = v; });
+    requestReplace(keep, '✅ 초기화했어요!');
+  };
+  // 실제 교체는 메인(펫) 쪽 엔진이 수행 — 메인이 저장하면서 덮어쓰는 걸 막기 위해
+  function requestReplace(obj, doneMsg) {
+    localStorage.setItem(IMPORT_KEY, JSON.stringify(obj));
+    $('#data-msg').textContent = '⏳ 적용 중...';
+    const t0 = Date.now();
+    const iv = setInterval(() => {
+      if (!localStorage.getItem(IMPORT_KEY)) { clearInterval(iv); $('#data-msg').textContent = doneMsg; setTimeout(() => location.reload(), 800); }
+      else if (Date.now() - t0 > 4000) {                   // 메인 창이 없으면 직접 적용
+        clearInterval(iv);
+        deskpetKeys().forEach(k => localStorage.removeItem(k));
+        for (const [k, v] of Object.entries(obj)) if (k.startsWith('deskpet') && typeof v === 'string') localStorage.setItem(k, v);
+        localStorage.removeItem(IMPORT_KEY);
+        $('#data-msg').textContent = doneMsg; setTimeout(() => location.reload(), 800);
+      }
+    }, 300);
+  }
+}
+/* ============================================================================
+   대사 풀 창 (?mode=pool)
+   - 캐릭터·상황(트리거)별로 저장된 AI 대사를 보고, 고치고, 지우고, 직접 추가
+   - 풀이 비어 있는 상황은 기본 대사가 나옴 (원본 규칙: 풀에 하나라도 있으면 풀에서만 뽑음)
+   - ▶ 누르면 펫이 그 대사를 바로 말해봄
+   ============================================================================ */
+const SAY_KEY = 'deskpet_say';   // 대사 풀 창 → 메인: 미리 말해보기 요청
+
+function initPoolView() {
+  const TRIGGERS = Object.keys(TRIGGER_LABELS);
+  let D = loadD(), ci = 0, trig = TRIGGERS[0], busy = false;
+  const chars = () => (D.chars || [defChar(0)]).slice(0, D.common?.hasChar1 ? 2 : 1);
+  const lines = () => loadPool()[ci]?.[trig] || [];
+  const setLines = arr => { const p = loadPool(); if (!p[ci]) p[ci] = {}; p[ci][trig] = arr; savePool(p); };
+  const note = t => { $('#pl-note').textContent = t; };
+
+  function renderChars() {
+    $('#pl-chars').innerHTML = chars().map((c, i) =>
+      `<button class="log-filter-btn${i === ci ? ' active' : ''}" data-ci="${i}">${esc(c.name)}</button>`).join('');
+  }
+  function renderTriggers() {
+    const p = loadPool()[ci] || {};
+    const total = TRIGGERS.reduce((s, t) => s + (p[t]?.length || 0), 0);
+    $('#pl-total').textContent = `총 ${total}개 · 상황마다 최대 ${POOL_MAX}개`;
+    $('#pl-trigs').innerHTML = TRIGGERS.map(t => {
+      const n = p[t]?.length || 0;
+      return `<button class="pl-trig${t === trig ? ' active' : ''}" data-t="${t}">
+        <span>${TRIGGER_LABELS[t]}</span><b class="${n ? '' : 'zero'}">${n}</b></button>`;
+    }).join('');
+  }
+  function renderLines() {
+    const arr = lines();
+    $('#pl-title').textContent = `${TRIGGER_LABELS[trig]} (${trig})`;
+    const list = $('#pl-lines');
+    if (!arr.length) {
+      list.innerHTML = `<div class="pl-empty">저장된 AI 대사가 없어서 아래 기본 대사가 나와요</div>` +
+        (FALLBACKS[trig] || FALLBACKS.idle).map(l => `<div class="pl-row fallback"><span class="pl-text">${esc(l)}</span>
+          <button class="pl-ico" data-say="${esc(l)}" title="펫이 말해보기">▶</button></div>`).join('');
+      return;
+    }
+    list.innerHTML = arr.map((l, i) => `<div class="pl-row">
+        <input class="pl-input" data-i="${i}" value="${esc(l)}" maxlength="60">
+        <button class="pl-ico" data-say-i="${i}" title="펫이 말해보기">▶</button>
+        <button class="pl-ico del" data-del="${i}" title="삭제">✕</button></div>`).join('');
+  }
+  const renderAll = () => { renderChars(); renderTriggers(); renderLines(); };
+
+  // ---- 선택 ----
+  $('#pl-chars').addEventListener('click', e => { const b = e.target.closest('[data-ci]'); if (b) { ci = +b.dataset.ci; renderAll(); } });
+  $('#pl-trigs').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b) { trig = b.dataset.t; renderTriggers(); renderLines(); } });
+
+  // ---- 수정 / 삭제 / 말해보기 ----
+  $('#pl-lines').addEventListener('change', e => {
+    const inp = e.target.closest('.pl-input'); if (!inp) return;
+    const arr = lines(), v = inp.value.trim(), i = +inp.dataset.i;
+    if (!v) arr.splice(i, 1); else arr[i] = v;
+    setLines(arr); renderTriggers(); renderLines(); note('✏️ 고쳤어요');
+  });
+  $('#pl-lines').addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.classList.contains('pl-input')) e.target.blur(); });
+  $('#pl-lines').addEventListener('click', e => {
+    const del = e.target.closest('[data-del]'), sy = e.target.closest('[data-say], [data-say-i]');
+    if (del) { const arr = lines(); arr.splice(+del.dataset.del, 1); setLines(arr); renderTriggers(); renderLines(); note('🗑️ 지웠어요'); }
+    if (sy) {
+      const text = sy.dataset.say ?? lines()[+sy.dataset.sayI];
+      jset(SAY_KEY, { ci, text, ts: Date.now() });
+      note('▶ 펫에게 말하게 했어요');
+    }
+  });
+
+  // ---- 직접 추가 ----
+  function addLine() {
+    const inp = $('#pl-new'), v = inp.value.trim(); if (!v) return;
+    const arr = lines();
+    if (arr.includes(v)) return note('이미 있는 대사예요');
+    arr.push(v); if (arr.length > POOL_MAX) arr.shift();
+    setLines(arr); inp.value = ''; renderTriggers(); renderLines(); note('➕ 추가했어요');
+    $('#pl-lines').scrollTop = 1e9;
+  }
+  $('#pl-add').onclick = addLine;
+  $('#pl-new').addEventListener('keydown', e => { if (e.key === 'Enter') addLine(); });
+
+  // ---- 비우기 ----
+  $('#pl-clear-trig').onclick = () => {
+    if (!lines().length || !confirm(`"${TRIGGER_LABELS[trig]}" 대사를 모두 지울까요?\n(비어 있으면 기본 대사가 나와요)`)) return;
+    setLines([]); renderTriggers(); renderLines(); note('비웠어요');
+  };
+  $('#pl-clear-all').onclick = () => {
+    const name = chars()[ci]?.name;
+    if (!confirm(`${name}의 대사 풀을 전부 지울까요?\nAPI 키가 있으면 나중에 다시 자동으로 채워져요.`)) return;
+    poolClear(ci); renderAll(); note('전부 비웠어요');
+  };
+
+  // ---- AI로 채우기 (한 번 호출 = 상황마다 3개씩) ----
+  $('#pl-ai').onclick = async () => {
+    D = loadD();
+    if (!D.common?.apiKey) return note('⚠️ 설정 → 공통에서 Gemini API 키를 먼저 넣어주세요');
+    if (busy) return;
+    busy = true; $('#pl-ai').disabled = true; note('🤖 만드는 중... (10~20초)');
+    try {
+      const two = D.common.hasChar1 && D.chars[1];
+      const result = await geminiAllTriggers({
+        apiKey: D.common.apiKey, me: D.chars[ci], other: two ? D.chars[1 - ci] : null,
+        relation: D.common.relation || (two ? getAffinityLabel(D.common.affinity)[2] : ''),
+      });
+      let saved = 0;
+      for (const [t, v] of Object.entries(result))
+        for (const line of (Array.isArray(v) ? v : [v]))
+          if (typeof line === 'string' && line.trim()) { poolPush(ci, t, line.trim()); saved++; }
+      const l = loadLog(); l.push({ ci, trigger: '[전체]', time: Date.now(), line: `[대사 풀 창에서 ${saved}개 생성]`, fail: null }); saveLog(l);
+      note(`✅ ${saved}개 추가했어요`);
+    } catch (e) {
+      note('❌ ' + (e.message || '실패'));
+    } finally {
+      busy = false; $('#pl-ai').disabled = false; renderAll();
+    }
+  };
+
+  // 메인 쪽에서 자동 보충되면 반영 (편집 중일 땐 건드리지 않음)
+  let lastSig = '';
+  setInterval(() => {
+    if (document.activeElement && document.activeElement.classList.contains('pl-input')) return;
+    const sig = localStorage.getItem(POOL_KEY) || '';
+    if (sig !== lastSig) { lastSig = sig; D = loadD(); renderAll(); }
+  }, 1500);
+  lastSig = localStorage.getItem(POOL_KEY) || '';
+  renderAll();
+}
+
+/* ============================================================================
+   시작
+   ============================================================================ */
+if (MODE === 'settings') {
+  initSettingsView();
+} else if (MODE === 'pool') {
+  initPoolView();
+} else {
+  const E = createEngine();
+  window.DeskPet = E;   // 디버그용
+  if (MODE === 'free') initFreeView(E); else initWindowView(E);
+  // 테스트용: Ctrl+Shift+D → 시간 20배속 토글
+  addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.code === 'KeyD') E.toggleSpeed(); });
+}
+</script>
+</body>
+</html>

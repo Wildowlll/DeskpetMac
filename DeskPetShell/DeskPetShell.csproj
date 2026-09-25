@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!--
+      WebView2CompositionControl(자유 모드)은 내부에서 Windows.Graphics.Capture(WinRT)를 씀.
+      TFM에 Windows SDK 버전을 명시해야 Microsoft.Windows.SDK.NET(CsWinRT 투영)이 같이 들어옴.
+      17763 = Windows 10 1809. 캡처 API 최소 요구 버전이라 이보다 낮추면 안 됨.
+    -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <!-- 트레이 아이콘(NotifyIcon)용 -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>DeskPetShell</RootNamespace>
+    <AssemblyName>DeskPet</AssemblyName>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+    <!-- exe 속성 창에 보이는 정보. 업데이트할 때 Version만 올리면 됨 -->
+    <Version>1.0.0</Version>
+    <Product>데스크펫</Product>
+    <Company>Wildowlll</Company>
+    <Description>데스크펫 윈도우판</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- WPF와 WinForms 이름이 겹치지 않게 (Application, MessageBox, Point 등) -->
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- web 폴더(HTML)를 빌드 출력으로 복사 -->
+    <None Update="web\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

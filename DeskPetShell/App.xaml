@@ -1,0 +1,6 @@
+<Application x:Class="DeskPetShell.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnExplicitShutdown">
+    <!-- 시작 창은 App.xaml.cs에서 저장된 모드를 보고 결정 -->
+</Application>

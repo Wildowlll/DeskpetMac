@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>DeskPet</string>
+    <key>CFBundleDisplayName</key>
+    <string>데스크펫</string>
+    <key>CFBundleExecutable</key>
+    <string>DeskPet</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.wildowlll.deskpet</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <!-- 업데이트할 때 이 버전만 올리면 됨 (zip 이름에도 붙음) -->
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleIconFile</key>
+    <string>AppIcon</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>13.0</string>
+    <!-- Dock 아이콘 없이 메뉴바(🐾)에만 상주 -->
+    <key>LSUIElement</key>
+    <true/>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>ko</string>
+</dict>
+</plist>
